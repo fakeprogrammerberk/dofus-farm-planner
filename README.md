@@ -19,3 +19,11 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 ## Usage
 
 Open `index.html` (farm planner) or `quests.html` (quest tracker) in a browser (internet needed on first launch to download game data).
+
+## Collection Tracker (`collection.html`)
+
+- **Archmonsters:** all archmonsters with picture, level, the normal monster they replace, and their Eternal Harvest quest step
+- **Dungeon bosses:** every boss with its dungeon and entrance coordinates (click to copy `/travel x,y`)
+- Set a quantity for each; status shows Missing / Collected / Exchangeable (2 or more)
+- Filter by status or quest step, search, sort by any column; progress is saved automatically
+- Reset one list or everything; export/import a backup

@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dofus Collection Tracker</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a21;--surface2:#1e222b;--line:#2c313c;
+  --text:#e9ebf0;--dim:#9aa1b0;--accent:#5cc8a8;--accent-soft:#5cc8a822;
+  --good:#5fd38d;--warn:#e8b54a;--bad:#ef6f6f;--trade:#7fb2ff;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- top bar ---------- */
+.bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#0f1115f2;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.logo{font-weight:700;font-size:18px}
+.logo span{color:var(--accent)}
+.nav{display:flex;gap:4px;margin-right:auto}
+.nav a{padding:6px 10px;border-radius:8px;color:var(--dim);text-decoration:none;font-size:13px;font-weight:600}
+.nav a:hover{color:var(--text)}
+.nav a.on{color:var(--accent);background:var(--accent-soft)}
+.status{font-size:12px;color:var(--dim);max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--good)}
+.btn{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.danger{color:var(--bad);border-color:#ef6f6f55}
+.btn.danger:hover{border-color:var(--bad);background:#ef6f6f14}
+
+.wrap{max-width:1200px;margin:0 auto;padding:18px 20px 60px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+
+/* ---------- summary ---------- */
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:800px){.summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{padding:12px 14px}
+.kpi small{display:block;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.kpi strong{font-size:22px}
+.kpi .meter{margin-top:6px}
+.meter{height:6px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .25s}
+
+/* ---------- tabs & tools ---------- */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:10px 16px;color:var(--dim);font-weight:600}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.input{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.input:focus{outline:none;border-color:var(--accent)}
+.tools .search{flex:1 1 220px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;border-right:1px solid var(--line);padding:7px 12px;font-size:13px;color:var(--dim)}
+.seg button:last-child{border-right:0}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.seg button .n{opacity:.7;font-size:11px;margin-left:4px}
+
+/* ---------- table ---------- */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th{background:var(--surface2);color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:10px;border-bottom:1px solid var(--line);white-space:nowrap;user-select:none}
+th.sort{cursor:pointer}
+th.sort:hover{color:var(--text)}
+th .arrow{opacity:.35;margin-left:3px}
+th.active{color:var(--accent)}
+th.active .arrow{opacity:1}
+td{padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:hover{background:#ffffff05}
+tr.have td{background:#5fd38d08}
+.c{text-align:center}
+.step{font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+.mon{display:flex;align-items:center;gap:10px}
+.mon img{width:44px;height:44px;object-fit:contain;flex:none}
+.mon .nm{font-weight:600;color:var(--accent)}
+.mon .lv{color:var(--dim);font-size:12px}
+.base{display:flex;align-items:center;gap:6px;color:var(--text)}
+.base img{width:26px;height:26px;object-fit:contain;opacity:.85}
+.tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+.tag.missing{color:var(--bad);background:#ef6f6f1a}
+.tag.have{color:var(--good);background:#5fd38d1a}
+.tag.trade{color:var(--trade);background:#7fb2ff1f}
+.qty{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--bg)}
+.qty button{background:none;border:0;width:28px;height:32px;color:var(--dim);font-size:16px;line-height:1}
+.qty button:hover{color:var(--text);background:var(--surface2)}
+.qty input{width:46px;height:32px;border:0;border-left:1px solid var(--line);border-right:1px solid var(--line);background:none;text-align:center;-moz-appearance:textfield}
+.qty input::-webkit-outer-spin-button,.qty input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.qty input:focus{outline:none;background:#ffffff08}
+.coord{display:inline-flex;align-items:center;gap:4px;background:var(--accent-soft);color:var(--accent);border:1px solid #5cc8a855;border-radius:6px;padding:2px 8px;font:600 12px ui-monospace,Consolas,monospace}
+.coord:hover{background:#5cc8a83a}
+.muted{color:var(--dim)}
+.empty{color:var(--dim);text-align:center;padding:30px 14px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#08140f;font-weight:700;padding:8px 14px;border-radius:8px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo">Dofus <span>Collection</span></div>
+  <nav class="nav"><a href="index.html">Farm Planner</a><a href="quests.html">Quests</a><a href="collection.html" class="on">Collection</a></nav>
+  <span class="status" id="status">Starting…</span>
+  <button class="btn" id="sync" title="Download the latest data from DofusDB">↻ Update data</button>
+  <button class="btn" id="exportBtn" title="Save your collection to a backup file">Export</button>
+  <label class="btn" title="Load your collection from a backup file">Import<input id="importFile" type="file" accept=".json,application/json" hidden></label>
+  <button class="btn danger" id="resetBtn">Reset progress</button>
+</div>
+
+<div class="wrap">
+  <div class="summary" id="summary"></div>
+  <div class="card" style="padding:16px">
+    <div class="tabs">
+      <button data-tab="arch" id="tabArch">Archmonsters</button>
+      <button data-tab="boss" id="tabBoss">Dungeon bosses</button>
+    </div>
+    <div class="tools">
+      <input class="input search" id="search" placeholder="Search…" autocomplete="off">
+      <select class="input" id="stepSel" title="Eternal Harvest quest step"></select>
+      <div class="seg" id="statusSeg"></div>
+    </div>
+    <div id="table"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<footer>Data from <a href="https://dofusdb.fr" target="_blank" rel="noopener">DofusDB</a>. Your collection is saved automatically in this browser — use Export to back it up.</footer>
+
+<script>
+'use strict';
+/* =========================================================
+   Config & helpers
+   ========================================================= */
+const API = 'https://api.dofusdb.fr';
+const LANG = 'en';
+const HARVEST_QUEST = 439;           // "An Eternal Harvest"
+const CACHE_KEY = 'dct-data-v1';
+const SAVE_KEY = 'dct-collection';
+const PREFS_KEY = 'dct-prefs';
+const STALE_MS = 7 * 24 * 3600 * 1000;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n || 0).toLocaleString('en-US');
+const name = o => (o && typeof o === 'object') ? (o[LANG] || o.fr || '') : (o || '');
+const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function loadJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true } catch { return false } }
+function setStatus(msg, kind = '') { const el = $('status'); el.textContent = msg; el.title = msg; el.className = 'status ' + kind; }
+const levelRange = grades => { const l = (grades || []).map(g => g.level).filter(Number.isFinite); if (!l.length) return ''; const a = Math.min(...l), b = Math.max(...l); return a === b ? String(a) : a + ' - ' + b; };
+const monImg = gfx => gfx != null ? `${API}/img/monsters/${gfx}.png` : '';
+
+/* =========================================================
+   State
+   ========================================================= */
+// data = { at, arch:[{id,name,level,img,step,base:{name,img}}], boss:[{id,key,name,level,img,dungeon,xy}], steps:n }
+let data = null;
+let saved = Object.assign({ arch: {}, boss: {} }, loadJSON(SAVE_KEY, {}));   // { arch:{id:qty}, boss:{key:qty} }
+const prefs = Object.assign({ tab: 'arch', status: 'all', step: 'all', sortKey: 'step', sortDir: 1 }, loadJSON(PREFS_KEY, {}));
+let search = '';
+
+function persist() { if (!saveJSON(SAVE_KEY, saved)) setStatus('Could not save — browser storage is full or blocked.', 'err'); }
+const savePrefs = () => saveJSON(PREFS_KEY, prefs);
+
+/* =========================================================
+   DofusDB fetching
+   ========================================================= */
+async function getJSON(url, tries = 3) {
+  for (let i = 0; ; i++) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
+      const r = await fetch(url, { signal: ctl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(t);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      if (i >= tries - 1) throw e;
+      await new Promise(res => setTimeout(res, 800 * (i + 1)));
+    }
+  }
+}
+function buildURL(path, params) {
+  const u = new URL(API + '/' + path);
+  for (const [k, v] of params) u.searchParams.append(k, v);
+  return u;
+}
+// Fetch every page of a (filtered) collection.
+async function fetchAll(path, fields, filters = [], label = path) {
+  const base = [...filters, ...fields.map(f => ['$select[]', f])];
+  const rows = [];
+  for (let skip = 0; ; ) {
+    const j = await getJSON(buildURL(path, [['$limit', '50'], ['$skip', String(skip)], ...base]));
+    rows.push(...j.data);
+    skip += j.data.length;
+    setStatus(`Downloading ${label}… ${num(rows.length)}${j.total ? ' / ' + num(j.total) : ''}`);
+    if (!j.data.length || skip >= (j.total ?? 0)) break;
+  }
+  return rows;
+}
+async function fetchByIds(path, ids, fields) {
+  const list = [...new Set(ids.map(String))], out = [];
+  const jobs = [];
+  for (let i = 0; i < list.length; i += 50) {
+    const chunk = list.slice(i, i + 50);
+    jobs.push(getJSON(buildURL(path, [['$limit', '50'], ...chunk.map(id => ['id[$in][]', id]), ...fields.map(f => ['$select[]', f])])).then(j => out.push(...j.data)));
+  }
+  await Promise.all(jobs);
+  return out;
+}
+
+let syncing = false;
+async function sync() {
+  if (syncing) return;
+  syncing = true; $('sync').disabled = true;
+  try {
+    setStatus('Connecting to DofusDB…');
+    const nm = ['name.' + LANG, 'name.fr'];
+    const [archs, bases, quest, dungeons] = await Promise.all([
+      fetchAll('monsters', ['id', 'gfxId', 'grades.level', ...nm], [['isMiniBoss', 'true']], 'archmonsters'),
+      fetchAll('monsters', ['id', 'gfxId', 'correspondingMiniBossId', ...nm], [['correspondingMiniBossId[$gt]', '0']], 'monsters'),
+      getJSON(buildURL('quests', [['id', String(HARVEST_QUEST)], ['$select[]', 'stepIds']])),
+      fetchAll('dungeons', ['id', 'entranceMapId', 'bosses', 'optimalPlayerLevel', ...nm], [], 'dungeons'),
+    ]);
+
+    // Which Eternal Harvest step asks for which archmonster.
+    const stepIds = (quest.data?.[0]?.stepIds || []).map(String);
+    const stepOf = new Map();
+    if (stepIds.length) {
+      const objs = await fetchAll('quest-objectives', ['stepId', 'parameters.parameter1', 'text.' + LANG], stepIds.map(id => ['stepId[$in][]', id]), 'quest steps');
+      for (const o of objs) {
+        const m = /\{monster,(\d+)/.exec(name(o.text))?.[1] ?? o.parameters?.parameter1;
+        if (m) stepOf.set(String(m), stepIds.indexOf(String(o.stepId)) + 1);
+      }
+    }
+    const baseOf = new Map(bases.map(b => [String(b.correspondingMiniBossId), b]));
+    const arch = archs.map(a => {
+      const b = baseOf.get(String(a.id));
+      return { id: String(a.id), name: name(a.name) || 'Archmonster #' + a.id, level: levelRange(a.grades), img: monImg(a.gfxId),
+        step: stepOf.get(String(a.id)) || 0, base: b ? { name: name(b.name), img: monImg(b.gfxId) } : null };
+    });
+
+    // Dungeon bosses with entrance coordinates.
+    const bossIds = dungeons.flatMap(d => d.bosses || []);
+    const [bossMobs, positions] = await Promise.all([
+      fetchByIds('monsters', bossIds, ['id', 'gfxId', 'grades.level', ...nm]),
+      fetchByIds('map-positions', dungeons.map(d => d.entranceMapId).filter(Boolean), ['id', 'posX', 'posY']),
+    ]);
+    const mobById = new Map(bossMobs.map(m => [m.id, m]));
+    const posById = new Map(positions.map(p => [p.id, p]));
+    const boss = [];
+    for (const d of dungeons) {
+      const p = posById.get(d.entranceMapId);
+      for (const bid of d.bosses || []) {
+        const m = mobById.get(bid); if (!m) continue;
+        boss.push({ key: d.id + '-' + bid, id: String(bid), name: name(m.name) || 'Boss #' + bid, level: levelRange(m.grades), img: monImg(m.gfxId),
+          dungeon: name(d.name) || 'Dungeon #' + d.id, xy: p ? [p.posX, p.posY] : null, dlevel: d.optimalPlayerLevel || 0 });
+      }
+    }
+
+    data = { at: Date.now(), arch, boss, steps: stepIds.length };
+    const ok = saveJSON(CACHE_KEY, data);
+    render();
+    setStatus(`Updated: ${arch.length} archmonsters, ${boss.length} dungeon bosses.` + (ok ? '' : ' (Too large to cache offline.)'), 'ok');
+  } catch (e) {
+    console.error(e);
+    setStatus('Update failed: ' + e.message + (data ? ' — showing saved data.' : ' — check your internet connection and retry.'), 'err');
+  } finally { syncing = false; $('sync').disabled = false; }
+}
+
+/* =========================================================
+   Logic
+   ========================================================= */
+const keyOf = (tab, r) => tab === 'arch' ? r.id : r.key;
+const qtyOf = (tab, r) => Number(saved[tab][keyOf(tab, r)] || 0);
+const statusOf = q => q <= 0 ? 'missing' : q === 1 ? 'have' : 'trade';
+const STATUS_LABEL = { missing: 'Missing', have: 'Collected', trade: 'Exchangeable' };
+
+function setQty(tab, key, q) {
+  q = Math.max(0, Math.min(9999, Math.floor(Number(q) || 0)));
+  if (q) saved[tab][key] = q; else delete saved[tab][key];
+  persist();
+}
+
+function rowsFor(tab) {
+  const all = data[tab];
+  const f = fold(search.trim());
+  let rows = all.filter(r => {
+    if (tab === 'arch' && prefs.step !== 'all' && String(r.step) !== prefs.step) return false;
+    if (f && !fold(r.name + ' ' + (r.base?.name || '') + ' ' + (r.dungeon || '')).includes(f)) return false;
+    const s = statusOf(qtyOf(tab, r));
+    if (prefs.status === 'have' && s === 'missing') return false;   // "Collected" includes exchangeable
+    if (prefs.status === 'missing' && s !== 'missing') return false;
+    if (prefs.status === 'trade' && s !== 'trade') return false;
+    return true;
+  });
+  const k = prefs.sortKey, d = prefs.sortDir;
+  const lvl = r => parseInt(r.level) || 0;
+  const cmp = {
+    step: (a, b) => (a.step || 99) - (b.step || 99) || a.name.localeCompare(b.name),
+    name: (a, b) => a.name.localeCompare(b.name),
+    level: (a, b) => lvl(a) - lvl(b),
+    base: (a, b) => (a.base?.name || '').localeCompare(b.base?.name || ''),
+    dungeon: (a, b) => a.dungeon.localeCompare(b.dungeon),
+    status: (a, b) => qtyOf(tab, a) - qtyOf(tab, b),
+    qty: (a, b) => qtyOf(tab, a) - qtyOf(tab, b),
+  }[k] || ((a, b) => a.name.localeCompare(b.name));
+  return rows.sort((a, b) => cmp(a, b) * d);
+}
+
+/* =========================================================
+   Rendering
+   ========================================================= */
+function renderSummary() {
+  const box = (label, have, total) => { const p = total ? have / total * 100 : 0;
+    return `<div class="card kpi"><small>${label}</small><strong>${num(have)}</strong> <span class="muted">/ ${num(total)}</span><div class="meter"><i style="width:${p}%"></i></div></div>`; };
+  const archHave = data.arch.filter(r => qtyOf('arch', r) > 0).length;
+  const bossHave = data.boss.filter(r => qtyOf('boss', r) > 0).length;
+  const archTrade = data.arch.reduce((s, r) => s + Math.max(0, qtyOf('arch', r) - 1), 0);
+  const stepsDone = data.steps ? [...Array(data.steps)].filter((_, i) => { const st = data.arch.filter(r => r.step === i + 1); return st.length && st.every(r => qtyOf('arch', r) > 0); }).length : 0;
+  $('summary').innerHTML = box('Archmonsters collected', archHave, data.arch.length)
+    + box('Eternal Harvest steps complete', stepsDone, data.steps)
+    + `<div class="card kpi"><small>Spare archmonsters to trade</small><strong>${num(archTrade)}</strong><div class="muted" style="font-size:12px;margin-top:6px">extra souls beyond 1 each</div></div>`
+    + box('Dungeon bosses collected', bossHave, data.boss.length);
+}
+
+function renderTools() {
+  $('tabArch').classList.toggle('on', prefs.tab === 'arch');
+  $('tabBoss').classList.toggle('on', prefs.tab === 'boss');
+  $('search').placeholder = prefs.tab === 'arch' ? 'Search archmonster or monster…' : 'Search boss or dungeon…';
+  const sel = $('stepSel');
+  sel.style.display = prefs.tab === 'arch' && data.steps ? '' : 'none';
+  if (prefs.tab === 'arch') {
+    const opts = ['<option value="all">All steps</option>'];
+    for (let i = 1; i <= data.steps; i++) {
+      const st = data.arch.filter(r => r.step === i), have = st.filter(r => qtyOf('arch', r) > 0).length;
+      opts.push(`<option value="${i}">Step ${i} — ${have}/${st.length}${st.length && have === st.length ? ' ✓' : ''}</option>`);
+    }
+    if (data.arch.some(r => !r.step)) opts.push('<option value="0">Not in the quest</option>');
+    sel.innerHTML = opts.join(''); sel.value = prefs.step;
+  }
+  const tab = prefs.tab, all = data[tab];
+  const count = s => all.filter(r => { const x = statusOf(qtyOf(tab, r)); return s === 'all' || (s === 'have' ? x !== 'missing' : x === s); }).length;
+  $('statusSeg').innerHTML = [['all', 'All'], ['have', 'Collected'], ['missing', 'Missing'], ['trade', 'Exchangeable']]
+    .map(([v, l]) => `<button data-status="${v}" class="${prefs.status === v ? 'on' : ''}">${l}<span class="n">${count(v)}</span></button>`).join('');
+  $('statusSeg').querySelectorAll('[data-status]').forEach(b => b.onclick = () => { prefs.status = b.dataset.status; savePrefs(); renderTools(); renderTable(); });
+}
+
+function th(label, key, cls = '') {
+  if (!key) return `<th class="${cls}">${label}</th>`;
+  const on = prefs.sortKey === key;
+  return `<th class="sort ${cls} ${on ? 'active' : ''}" data-sort="${key}">${label}<span class="arrow">${on ? (prefs.sortDir > 0 ? '▲' : '▼') : '⇅'}</span></th>`;
+}
+function qtyCell(tab, key, q) {
+  return `<div class="qty"><button data-dec="${key}" aria-label="Less">−</button><input type="number" min="0" value="${q}" data-qty="${key}" aria-label="Quantity"><button data-inc="${key}" aria-label="More">+</button></div>`;
+}
+function statusCell(q) { const s = statusOf(q); return `<span class="tag ${s}">${STATUS_LABEL[s]}</span>`; }
+
+function renderTable() {
+  const tab = prefs.tab, rows = rowsFor(tab);
+  let html;
+  if (tab === 'arch') {
+    html = `<div class="scroll"><table><thead><tr>${th('Step', 'step', 'c')}${th('Archmonster', 'name')}${th('Monster', 'base')}${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
+      const q = qtyOf(tab, r);
+      return `<tr class="${q ? 'have' : ''}" data-row="${r.id}">
+        <td class="c step">${r.step || '—'}</td>
+        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div><div class="nm">${esc(r.name)}</div><div class="lv">Level: ${esc(r.level || '?')}</div></div></div></td>
+        <td>${r.base ? `<div class="base">${r.base.img ? `<img src="${esc(r.base.img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}${esc(r.base.name)}</div>` : '<span class="muted">—</span>'}</td>
+        <td class="c" data-status-cell>${statusCell(q)}</td>
+        <td class="c">${qtyCell(tab, r.id, q)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  } else {
+    html = `<div class="scroll"><table><thead><tr>${th('Boss', 'name')}${th('Dungeon', 'dungeon')}<th>Coordinates</th>${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
+      const q = qtyOf(tab, r);
+      return `<tr class="${q ? 'have' : ''}" data-row="${r.key}">
+        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div><div class="nm">${esc(r.name)}</div><div class="lv">Level: ${esc(r.level || '?')}</div></div></div></td>
+        <td>${esc(r.dungeon)}${r.dlevel ? ` <span class="muted" style="font-size:12px">· Lv ${r.dlevel}</span>` : ''}</td>
+        <td>${r.xy ? `<button class="coord" data-travel="${r.xy[0]},${r.xy[1]}" title="Copy /travel ${r.xy[0]},${r.xy[1]}">📍 [${r.xy[0]}, ${r.xy[1]}]</button>` : '<span class="muted">—</span>'}</td>
+        <td class="c" data-status-cell>${statusCell(q)}</td>
+        <td class="c">${qtyCell(tab, r.key, q)}</td></tr>`;
+    }).join('')}</tbody></table></div>`;
+  }
+  $('table').innerHTML = rows.length ? html : '<div class="empty">Nothing matches these filters.</div>';
+  bindTable(tab);
+}
+
+function bindTable(tab) {
+  const t = $('table');
+  t.querySelectorAll('[data-sort]').forEach(h => h.onclick = () => {
+    const k = h.dataset.sort;
+    prefs.sortDir = prefs.sortKey === k ? -prefs.sortDir : 1; prefs.sortKey = k; savePrefs(); renderTable();
+  });
+  // Update one row in place so the list doesn't jump around while you type.
+  const update = (key, q) => {
+    setQty(tab, key, q);
+    const row = t.querySelector(`[data-row="${CSS.escape(key)}"]`);
+    const nq = Number(saved[tab][key] || 0);
+    if (row) { row.classList.toggle('have', nq > 0); row.querySelector('[data-status-cell]').innerHTML = statusCell(nq); const inp = row.querySelector('[data-qty]'); if (document.activeElement !== inp) inp.value = nq; }
+    renderSummary(); renderTools();
+  };
+  t.querySelectorAll('[data-inc]').forEach(b => b.onclick = () => update(b.dataset.inc, Number(saved[tab][b.dataset.inc] || 0) + 1));
+  t.querySelectorAll('[data-dec]').forEach(b => b.onclick = () => update(b.dataset.dec, Number(saved[tab][b.dataset.dec] || 0) - 1));
+  t.querySelectorAll('[data-qty]').forEach(i => { i.oninput = () => update(i.dataset.qty, i.value); i.onfocus = () => i.select(); });
+  t.querySelectorAll('[data-travel]').forEach(b => b.onclick = () => copyTravel(b.dataset.travel));
+}
+
+function render() {
+  if (!data) { $('table').innerHTML = '<div class="empty">No data yet — click “Update data”.</div>'; return; }
+  renderSummary(); renderTools(); renderTable();
+}
+
+/* =========================================================
+   Copy coordinates, reset, backup
+   ========================================================= */
+let toastTimer;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
+function copyTravel(xy) {
+  const cmd = '/travel ' + xy;
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(cmd).then(() => toast('Copied “' + cmd + '” — paste it in the game chat'), () => prompt('Copy this:', cmd));
+  else prompt('Copy this:', cmd);
+}
+
+$('resetBtn').onclick = () => {
+  const tabName = prefs.tab === 'arch' ? 'archmonster' : 'dungeon boss';
+  const choice = prompt(`Reset progress?\n\nType 1 to reset only the ${tabName} list\nType 2 to reset EVERYTHING (archmonsters and bosses)\n\nThis can't be undone — use Export first if you want a backup.`);
+  if (choice === '1') { saved[prefs.tab] = {}; persist(); render(); setStatus(`The ${tabName} list has been reset.`, 'ok'); }
+  else if (choice === '2') { saved = { arch: {}, boss: {} }; persist(); render(); setStatus('All collection progress has been reset.', 'ok'); }
+};
+$('exportBtn').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'dofus-collection-tracker', savedAt: new Date().toISOString(), collection: saved }, null, 2)], { type: 'application/json' }));
+  a.download = `dofus-collection-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$('importFile').onchange = async e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  try {
+    const obj = JSON.parse(await file.text());
+    const c = obj?.collection ?? obj;
+    if (!c || typeof c !== 'object' || (!c.arch && !c.boss)) throw new Error('unrecognized file format');
+    const clean = src => { const out = {}; for (const [k, v] of Object.entries(src || {})) { const q = Math.floor(Number(v)); if (q > 0 && q < 10000) out[k] = q; } return out; };
+    if ((Object.keys(saved.arch).length || Object.keys(saved.boss).length) && !confirm('Replace your current collection with the one from this file?')) return;
+    saved = { arch: clean(c.arch), boss: clean(c.boss) }; persist(); render();
+    setStatus(`Imported ${Object.keys(saved.arch).length} archmonsters and ${Object.keys(saved.boss).length} bosses.`, 'ok');
+  } catch (err) { setStatus('Import failed: ' + err.message, 'err'); }
+  finally { e.target.value = ''; }
+};
+
+/* =========================================================
+   Wiring & startup
+   ========================================================= */
+document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => {
+  prefs.tab = b.dataset.tab; prefs.sortKey = prefs.tab === 'arch' ? 'step' : 'dungeon'; prefs.sortDir = 1; savePrefs(); render();
+});
+$('search').oninput = e => { search = e.target.value; renderTable(); };
+$('stepSel').onchange = e => { prefs.step = e.target.value; savePrefs(); renderTable(); };
+$('sync').onclick = sync;
+
+(function start() {
+  data = loadJSON(CACHE_KEY, null);
+  if (data && data.arch && data.boss) {
+    render();
+    setStatus('Loaded saved data from ' + new Date(data.at).toLocaleDateString('en-US') + '.', 'ok');
+    if (Date.now() - (data.at || 0) > STALE_MS) sync();
+  } else { data = null; render(); sync(); }
+})();
+</script>
+</body>
+</html>
