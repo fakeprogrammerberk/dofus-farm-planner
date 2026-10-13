@@ -1,5 +1,15 @@
 # Dofus Farm Planner
 
+## ▶ Open the tools
+
+| Tool | Link |
+|---|---|
+| 🌾 Farm Planner | **https://fakeprogrammerberk.github.io/dofus-farm-planner/** |
+| 📜 Quest Tracker | **https://fakeprogrammerberk.github.io/dofus-farm-planner/quests.html** |
+| 🏆 Collection (archmonsters & dungeon bosses) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/collection.html** |
+
+No install or account needed — just open a link. Your progress is saved in your own browser.
+
 A single-page tool for planning Dofus farming sessions, in English.
 
 - Browse areas and sub-areas (dungeons marked 🏰), or search a monster to see where it spawns
