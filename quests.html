@@ -93,8 +93,13 @@ a{color:var(--accent)}
 .pill.prog{color:var(--warn);background:#e8b54a1a}
 .pill.ok{color:var(--good);background:#5fd38d1a}
 .pill.lock{color:var(--bad);background:#ef6f6f14}
-.chev{color:var(--dim);background:none;border:0;padding:4px 6px;font-size:14px;transition:transform .15s}
-.quest.open .chev{transform:rotate(90deg)}
+.chev{flex:none;color:var(--accent);background:var(--accent-soft);border:1px solid #5cc8a855;border-radius:6px;padding:4px 10px;font-size:12px;font-weight:600;white-space:nowrap}
+.chev:hover{background:#5cc8a83a}
+.elsewhere{margin-top:10px;padding:12px;border:1px dashed var(--line);border-radius:8px}
+.elsewhere h3{margin:0 0 8px;font-size:13px;color:var(--dim);font-weight:600}
+.elsewhere button{display:block;width:100%;text-align:left;background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:7px 10px;margin-top:5px}
+.elsewhere button:hover{border-color:var(--accent)}
+.elsewhere small{color:var(--dim)}
 .detail{display:none;border-top:1px solid var(--line);padding:10px 12px 12px 42px}
 .quest.open .detail{display:block}
 .step{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
@@ -198,6 +203,7 @@ let data = null;
 // progress = { questId: { done:true } | { steps:[stepId,...] } }
 let progress = loadJSON(PROGRESS_KEY, {});
 const prefs = Object.assign({ cat: 'all', status: 'all', q: '', min: '', max: '', hideEvents: true, hideRepeat: false }, loadJSON(PREFS_KEY, {}));
+prefs.q = ''; // start every visit with an empty search box
 let shown = PAGE;
 const open = new Set();
 
@@ -501,7 +507,7 @@ function questHTML(id) {
       <input type="checkbox" class="box ${s === 'progress' ? 'partial' : ''}" data-quest="${id}" ${s === 'done' ? 'checked' : ''} title="Mark quest as completed">
       <div class="qmain" data-toggle="${id}"><div class="qname">${esc(q.name)}</div>
         <div class="qsub"><span>${lv}</span>${catName ? `<span>· ${esc(catName)}</span>` : ''}${q.steps.length ? `<span>· ${q.steps.length} step${q.steps.length > 1 ? 's' : ''}</span>` : ''}${pills}</div></div>
-      <button class="chev" data-toggle="${id}" aria-label="Show steps">▶</button>
+      <button class="chev" data-toggle="${id}">${isOpen ? 'Hide ▴' : 'Steps &amp; map ▾'}</button>
     </div>${detail}</div>`;
 }
 
@@ -511,6 +517,16 @@ function renderMain() {
   const scope = prefs.cat === 'all' ? allIds : (byCat.get(prefs.cat) || []);
   const s = stats(scope);
   const list = filtered();
+  // A search that matches exactly one quest opens it straight away.
+  if (prefs.q.trim() && list.length === 1 && !open.has(list[0])) { open.add(list[0]); loadDetail(list[0]); }
+  // When searching inside a category, also show matching quests from other categories.
+  let elsewhere = '';
+  const fq = fold(prefs.q.trim());
+  if (fq && prefs.cat !== 'all') {
+    const others = allIds.filter(id => data.quests[id].cat !== prefs.cat && fold(data.quests[id].name).includes(fq)).slice(0, 15);
+    if (others.length) elsewhere = `<div class="elsewhere"><h3>${list.length ? 'Also found in other categories' : 'Not in this category — found in:'}</h3>${others.map(id => {
+      const q = data.quests[id]; return `<button data-jump="${id}"><b>${esc(q.name)}</b> <small>· ${esc(data.cats.find(c => c.id === q.cat)?.name || '')} · Lv ${q.min || q.max || '?'}</small></button>`; }).join('')}</div>`;
+  }
   $('main').innerHTML = `
     <div class="head"><div><h1>${esc(title)}</h1><div class="meta">${s.done} of ${s.total} completed (${s.pct.toFixed(1)}%) · ${s.prog} in progress</div></div>
       ${prefs.cat !== 'all' ? '<button class="btn danger" id="resetCat" title="Clear progress for this category only">Reset this category</button>' : ''}</div>
@@ -525,7 +541,7 @@ function renderMain() {
       <label class="check"><input type="checkbox" id="hideEvents" ${prefs.hideEvents ? 'checked' : ''}> Hide events</label>
       <label class="check"><input type="checkbox" id="hideRepeat" ${prefs.hideRepeat ? 'checked' : ''}> Hide repeatable</label>
     </div>
-    <div id="qlist">${list.slice(0, shown).map(questHTML).join('') || '<div class="empty">No quests match these filters.</div>'}</div>
+    <div id="qlist">${list.slice(0, shown).map(questHTML).join('') || (elsewhere ? '' : '<div class="empty">No quests match these filters.</div>')}</div>${elsewhere}
     ${list.length > shown ? `<button class="btn more" id="more">Show more (${num(list.length - shown)} left)</button>` : ''}`;
   bindMain();
 }
