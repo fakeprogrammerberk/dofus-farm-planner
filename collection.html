@@ -80,6 +80,7 @@ tr.have td{background:#5fd38d08}
 .mon img{width:44px;height:44px;object-fit:contain;flex:none}
 .mon .nm{font-weight:600;color:var(--accent)}
 .mon .lv{color:var(--dim);font-size:12px}
+.lvcell{font-variant-numeric:tabular-nums;white-space:nowrap}
 .base{display:flex;align-items:center;gap:6px;color:var(--text)}
 .base img{width:26px;height:26px;object-fit:contain;opacity:.85}
 .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
@@ -300,7 +301,7 @@ function rowsFor(tab) {
     return true;
   });
   const k = prefs.sortKey, d = prefs.sortDir;
-  const lvl = r => parseInt(r.level) || 0;
+  const lvl = r => (parseInt(r.level) || 0) * 10000 + (parseInt(String(r.level).split('-')[1]) || parseInt(r.level) || 0);
   const cmp = {
     step: (a, b) => (a.step || 99) - (b.step || 99) || a.name.localeCompare(b.name),
     name: (a, b) => a.name.localeCompare(b.name),
@@ -365,20 +366,22 @@ function renderTable() {
   const tab = prefs.tab, rows = rowsFor(tab);
   let html;
   if (tab === 'arch') {
-    html = `<div class="scroll"><table><thead><tr>${th('Step', 'step', 'c')}${th('Archmonster', 'name')}${th('Monster', 'base')}${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
+    html = `<div class="scroll"><table><thead><tr>${th('Step', 'step', 'c')}${th('Archmonster', 'name')}${th('Level', 'level', 'c')}${th('Monster', 'base')}${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
       const q = qtyOf(tab, r);
       return `<tr class="${q ? 'have' : ''}" data-row="${r.id}">
         <td class="c step">${r.step || '—'}</td>
-        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div><div class="nm">${esc(r.name)}</div><div class="lv">Level: ${esc(r.level || '?')}</div></div></div></td>
+        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div class="nm">${esc(r.name)}</div></div></td>
+        <td class="c lvcell">${esc(r.level || '?')}</td>
         <td>${r.base ? `<div class="base">${r.base.img ? `<img src="${esc(r.base.img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}${esc(r.base.name)}</div>` : '<span class="muted">—</span>'}</td>
         <td class="c" data-status-cell>${statusCell(q)}</td>
         <td class="c">${qtyCell(tab, r.id, q)}</td></tr>`;
     }).join('')}</tbody></table></div>`;
   } else {
-    html = `<div class="scroll"><table><thead><tr>${th('Boss', 'name')}${th('Dungeon', 'dungeon')}<th>Coordinates</th>${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
+    html = `<div class="scroll"><table><thead><tr>${th('Boss', 'name')}${th('Level', 'level', 'c')}${th('Dungeon', 'dungeon')}<th>Coordinates</th>${th('Status', 'status', 'c')}${th('Quantity', 'qty', 'c')}</tr></thead><tbody>${rows.map(r => {
       const q = qtyOf(tab, r);
       return `<tr class="${q ? 'have' : ''}" data-row="${r.key}">
-        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div><div class="nm">${esc(r.name)}</div><div class="lv">Level: ${esc(r.level || '?')}</div></div></div></td>
+        <td><div class="mon">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">` : ''}<div class="nm">${esc(r.name)}</div></div></td>
+        <td class="c lvcell">${esc(r.level || '?')}</td>
         <td>${esc(r.dungeon)}${r.dlevel ? ` <span class="muted" style="font-size:12px">· Lv ${r.dlevel}</span>` : ''}</td>
         <td>${r.xy ? `<button class="coord" data-travel="${r.xy[0]},${r.xy[1]}" title="Copy /travel ${r.xy[0]},${r.xy[1]}">📍 [${r.xy[0]}, ${r.xy[1]}]</button>` : '<span class="muted">—</span>'}</td>
         <td class="c" data-status-cell>${statusCell(q)}</td>
