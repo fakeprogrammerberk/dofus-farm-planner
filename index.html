@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dofus Farm Planner</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a21;--surface2:#1e222b;--line:#2c313c;
+  --text:#e9ebf0;--dim:#9aa1b0;--accent:#5cc8a8;--accent-soft:#5cc8a822;
+  --good:#5fd38d;--warn:#e8b54a;--bad:#ef6f6f;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- top bar ---------- */
+.bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#0f1115f2;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.logo{font-weight:700;font-size:18px;letter-spacing:.01em;margin-right:auto}
+.logo span{color:var(--accent)}
+.status{font-size:12px;color:var(--dim);max-width:460px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--good)}
+.btn{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#08140f}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:300px 1fr;gap:18px;max-width:1600px;margin:0 auto;padding:18px 20px 60px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+
+/* ---------- sidebar ---------- */
+.side{display:flex;flex-direction:column;max-height:calc(100vh - 90px);position:sticky;top:76px}
+@media(max-width:900px){.side{position:static;max-height:420px}}
+.side-top{padding:14px;border-bottom:1px solid var(--line)}
+.input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.input:focus{outline:none;border-color:var(--accent)}
+.seg{display:grid;grid-template-columns:1fr 1fr;margin-top:10px;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{background:none;border:0;padding:7px;font-size:13px;color:var(--dim)}
+.seg button.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.list{overflow:auto;padding:6px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:8px 10px}
+.row:hover{background:var(--surface2)}
+.row.on{background:var(--accent-soft);border-color:#5cc8a855}
+.row small{color:var(--dim);font-size:11px;white-space:nowrap}
+.hit{padding:8px 10px;border-bottom:1px solid var(--line)}
+.hit b{display:block;margin-bottom:4px}
+.hit button{display:block;width:100%;text-align:left;margin-top:4px;background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:6px 8px;font-size:12px}
+.hit button:hover{border-color:var(--accent)}
+.empty{color:var(--dim);text-align:center;padding:30px 14px}
+
+/* ---------- main ---------- */
+.main{min-width:0;padding:18px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}
+.head h1{margin:0;font-size:24px}
+.meta{color:var(--dim);font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:14px 0}
+.chip{background:var(--surface2);border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:12px}
+.chip.on{border-color:var(--accent);color:var(--accent);background:var(--accent-soft)}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:12px}
+.tabs button{background:none;border:0;border-bottom:2px solid transparent;padding:9px 14px;color:var(--dim);font-weight:600}
+.tabs button.on{color:var(--text);border-bottom-color:var(--accent)}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tools .input{width:auto;flex:1 1 200px}
+.tools select.input{flex:0 0 auto}
+
+/* ---------- tables ---------- */
+.scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+table{width:100%;border-collapse:collapse;min-width:960px}
+th{position:sticky;top:0;background:var(--surface2);color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.05em;text-align:left;padding:9px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover{background:#ffffff05}
+.c{text-align:center}
+.item{display:flex;align-items:center;gap:9px}
+.item img{width:32px;height:32px;object-fit:contain;flex:none}
+.item .sub{color:var(--dim);font-size:11px}
+.from{color:var(--dim);font-size:12px;max-width:240px}
+td input{width:100%;max-width:110px;background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px;text-align:right}
+td input:focus{outline:none;border-color:var(--accent)}
+.tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap}
+.tag.good{color:var(--good);background:#5fd38d1c}
+.tag.warn{color:var(--warn);background:#e8b54a1c}
+.tag.bad{color:var(--bad);background:#ef6f6f1c}
+.tag.none{color:var(--dim);background:#ffffff0a}
+.days{display:block;color:var(--dim);font-size:10px;margin-top:2px}
+.note{color:var(--dim);font-size:12px;margin-top:10px}
+
+/* ---------- summary ---------- */
+.summary{margin-top:18px;padding:16px;background:var(--surface2);border:1px solid var(--line);border-radius:var(--radius)}
+.summary h2{margin:0 0 12px;font-size:16px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:1000px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi small{display:block;color:var(--dim);font-size:11px}
+.kpi strong{font-size:19px}
+.kpi strong.good{color:var(--good)}.kpi strong.warn{color:var(--warn)}.kpi strong.bad{color:var(--bad)}
+.hours{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+.hours input{width:90px}
+footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo">Dofus <span>Farm Planner</span></div>
+  <span class="status" id="status">Starting…</span>
+  <button class="btn primary" id="sync" title="Download the latest data from DofusDB">↻ Update data</button>
+  <label class="btn" title="Import your saved prices, sales and stock">Import prices<input id="importFile" type="file" accept=".json,application/json" hidden></label>
+  <button class="btn" id="exportPrices" title="Save your prices, sales and stock to a JSON file">Export prices</button>
+</div>
+
+<div class="layout">
+  <aside class="card side">
+    <div class="side-top">
+      <input class="input" id="search" placeholder="Search areas…" autocomplete="off">
+      <div class="seg">
+        <button id="modeAreas" class="on">Areas</button>
+        <button id="modeMonsters">Monsters</button>
+      </div>
+    </div>
+    <div class="list" id="list"><div class="empty">Loading…</div></div>
+  </aside>
+  <section class="card main" id="main"><div class="empty">Pick an area on the left.</div></section>
+</div>
+
+<footer>Game data from <a href="https://dofusdb.fr" target="_blank" rel="noopener">DofusDB</a>. Your prices, sales and stock are stored only in this browser.</footer>
+
+<script>
+'use strict';
+/* =========================================================
+   Config & helpers
+   ========================================================= */
+const API = 'https://api.dofusdb.fr';
+const LANG = 'en';
+const CACHE_KEY = 'dfp-data-v1';
+const PRICES_KEY = 'dfp-prices';
+const HOURS_KEY = 'dfp-hours';
+const STALE_MS = 7 * 24 * 3600 * 1000; // auto-refresh cached data after a week
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n || 0).toLocaleString('en-US', {maximumFractionDigits: 0});
+const pct = n => (Math.round(n * 100) / 100).toLocaleString('en-US', {maximumFractionDigits: 2}) + '%';
+const name = o => (o && typeof o === 'object') ? (o[LANG] || o.fr || '') : (o || '');
+const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+function loadJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true } catch { return false } }
+
+function setStatus(msg, kind = '') { const el = $('status'); el.textContent = msg; el.title = msg; el.className = 'status ' + kind; }
+
+/* =========================================================
+   State
+   ========================================================= */
+// data = { at, areas:[{id,name}], subs:[{id,area,name,level,mobs:[],dungeon}], mobs:{id:{name,level,img,drops:[[itemId,rate]]}}, items:{id:{name,level,icon,type,cat}} }
+let data = null;
+let prices = loadJSON(PRICES_KEY, {});     // { itemId: {price, sales, stock} }
+let hours = loadJSON(HOURS_KEY, {});       // { areaId: hours }
+const ui = { mode: 'areas', area: null, sub: 'all', tab: 'res', filter: '', cat: 'all', sort: 'name' };
+
+/* =========================================================
+   DofusDB fetching
+   ========================================================= */
+async function getJSON(url, tries = 3) {
+  for (let i = 0; ; i++) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
+      const r = await fetch(url, {signal: ctl.signal, headers: {Accept: 'application/json'}});
+      clearTimeout(t);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      if (i >= tries - 1) throw e;
+      await new Promise(res => setTimeout(res, 800 * (i + 1)));
+    }
+  }
+}
+
+function buildURL(path, params) {
+  const u = new URL(API + '/' + path);
+  for (const [k, v] of params) u.searchParams.append(k, v);
+  return u;
+}
+
+// Run async jobs with limited concurrency.
+async function pool(jobs, limit, onDone) {
+  const out = new Array(jobs.length); let next = 0, done = 0;
+  async function worker() { while (next < jobs.length) { const i = next++; out[i] = await jobs[i](); onDone?.(++done, jobs.length); } }
+  await Promise.all(Array.from({length: Math.min(limit, jobs.length)}, worker));
+  return out;
+}
+
+// Fetch every row of a collection, page by page (the API caps pages at 50).
+async function fetchAll(path, fields, label) {
+  const sel = fields.map(f => ['$select[]', f]);
+  const first = await getJSON(buildURL(path, [['$limit', '50'], ['$skip', '0'], ...sel]));
+  const rows = [...first.data];
+  const size = first.data.length || 50, total = first.total ?? rows.length;
+  const jobs = [];
+  for (let skip = size; skip < total; skip += size)
+    jobs.push(() => getJSON(buildURL(path, [['$limit', '50'], ['$skip', String(skip)], ...sel])).then(j => j.data));
+  const pages = await pool(jobs, 6, (d, n) => setStatus(`Downloading ${label}… ${Math.round(d / n * 100)}%`));
+  for (const p of pages) rows.push(...p);
+  return rows;
+}
+
+async function fetchItemsByIds(ids) {
+  const chunks = [];
+  for (let i = 0; i < ids.length; i += 50) chunks.push(ids.slice(i, i + 50));
+  const fields = ['id', 'name.' + LANG, 'name.fr', 'level', 'iconId', 'typeId'];
+  const jobs = chunks.map(c => () => getJSON(buildURL('items', [['$limit', '50'], ...c.map(id => ['id[$in][]', id]), ...fields.map(f => ['$select[]', f])])).then(j => j.data));
+  const pages = await pool(jobs, 6, (d, n) => setStatus(`Downloading items… ${Math.round(d / n * 100)}%`));
+  return pages.flat();
+}
+
+let syncing = false;
+async function sync() {
+  if (syncing) return;
+  syncing = true; $('sync').disabled = true;
+  try {
+    setStatus('Connecting to DofusDB…');
+    const nm = ['name.' + LANG, 'name.fr'];
+    const [areas, subs, dungeons, types] = await Promise.all([
+      fetchAll('areas', ['id', ...nm], 'areas'),
+      fetchAll('subareas', ['id', 'areaId', 'level', 'monsters', ...nm], 'sub-areas'),
+      fetchAll('dungeons', ['id', ...nm], 'dungeons').catch(() => []),
+      fetchAll('item-types', ['id', 'categoryId', ...nm], 'item types').catch(() => []),
+    ]);
+    const mobsRaw = await fetchAll('monsters',
+      ['id', 'gfxId', 'subareas', 'grades.level', 'drops.objectId', 'drops.percentDropForGrade1', 'drops.percentDropForGrade5', ...nm], 'monsters');
+
+    const mobs = {};
+    const dropIds = new Set();
+    for (const m of mobsRaw) {
+      const drops = [];
+      for (const d of m.drops || []) {
+        const r1 = Number(d.percentDropForGrade1), r5 = Number(d.percentDropForGrade5);
+        const rate = Math.max(Number.isFinite(r1) ? r1 : 0, Number.isFinite(r5) ? r5 : 0);
+        if (rate > 0 && d.objectId != null) { drops.push([String(d.objectId), Math.round(rate * 100) / 100]); dropIds.add(String(d.objectId)); }
+      }
+      const lv = (m.grades || []).map(g => g.level).filter(Number.isFinite);
+      mobs[m.id] = {
+        name: name(m.name) || 'Monster #' + m.id,
+        level: lv.length ? (Math.min(...lv) === Math.max(...lv) ? String(lv[0]) : Math.min(...lv) + '–' + Math.max(...lv)) : '',
+        img: m.gfxId != null ? `${API}/img/monsters/${m.gfxId}.png` : '',
+        subs: (m.subareas || []).map(String),
+        drops,
+      };
+    }
+
+    const itemsRaw = await fetchItemsByIds([...dropIds]);
+    const typeById = new Map(types.map(t => [t.id, t]));
+    const items = {};
+    for (const it of itemsRaw) {
+      const t = typeById.get(it.typeId);
+      const tname = t ? name(t.name) : '';
+      const iname = name(it.name);
+      let cat = 'resource';
+      if (/soul/i.test(tname) || /^captured soul/i.test(iname)) cat = 'soul';
+      else if (t && Number(t.categoryId) === 0) cat = 'equipment';
+      items[it.id] = { name: iname || 'Item #' + it.id, level: it.level ?? '', icon: it.iconId != null ? `${API}/img/items/${it.iconId}.png` : '', type: tname, cat };
+    }
+
+    // Mark sub-areas that are dungeons (name match against the dungeon list).
+    const dungeonNames = new Set(dungeons.map(d => fold(name(d.name))).filter(Boolean));
+    const subList = subs.map(s => {
+      const nm2 = name(s.name) || 'Sub-area #' + s.id;
+      const ids = new Set((s.monsters || []).map(String));
+      return { id: String(s.id), area: String(s.areaId), name: nm2, level: s.level ?? '', mobs: [...ids], dungeon: dungeonNames.has(fold(nm2)) || /dungeon/i.test(nm2) };
+    });
+    // Also link monsters that list the sub-area on their side.
+    const subById = new Map(subList.map(s => [s.id, s]));
+    for (const [mid, m] of Object.entries(mobs)) for (const sid of m.subs) { const s = subById.get(sid); if (s && !s.mobs.includes(mid)) s.mobs.push(mid); }
+    for (const m of Object.values(mobs)) delete m.subs;
+
+    data = { at: Date.now(), areas: areas.map(a => ({ id: String(a.id), name: name(a.name) || 'Area #' + a.id })), subs: subList, mobs, items };
+    const saved = saveJSON(CACHE_KEY, data);
+    index();
+    if (!ui.area || !areaById.has(ui.area)) ui.area = visibleAreas()[0]?.id ?? null;
+    render();
+    setStatus(`Updated: ${num(data.areas.length)} areas, ${num(subList.length)} sub-areas, ${num(mobsRaw.length)} monsters, ${num(itemsRaw.length)} drops.` + (saved ? '' : ' (Too large to cache offline.)'), 'ok');
+  } catch (e) {
+    console.error(e);
+    setStatus('Update failed: ' + e.message + (data ? ' — showing cached data.' : ' — check your internet connection and retry.'), 'err');
+  } finally { syncing = false; $('sync').disabled = false; }
+}
+
+/* =========================================================
+   Indexes & queries
+   ========================================================= */
+let areaById = new Map(), subsByArea = new Map(), subById = new Map();
+function index() {
+  areaById = new Map(data.areas.map(a => [a.id, a]));
+  subById = new Map(data.subs.map(s => [s.id, s]));
+  subsByArea = new Map();
+  for (const s of data.subs) {
+    if (!s.mobs.some(id => data.mobs[id])) continue; // hide empty sub-areas
+    if (!subsByArea.has(s.area)) subsByArea.set(s.area, []);
+    subsByArea.get(s.area).push(s);
+  }
+  for (const list of subsByArea.values()) list.sort((a, b) => a.name.localeCompare(b.name));
+}
+const visibleAreas = () => data.areas.filter(a => subsByArea.has(a.id)).sort((a, b) => a.name.localeCompare(b.name));
+
+function monstersFor(areaId, subId) {
+  const subs = subId === 'all' ? (subsByArea.get(areaId) || []) : [subById.get(subId)].filter(Boolean);
+  const ids = new Set(subs.flatMap(s => s.mobs));
+  return [...ids].map(id => ({ id, ...data.mobs[id] })).filter(m => m.name);
+}
+
+function resourcesFor(mobs) {
+  const map = new Map();
+  for (const m of mobs) for (const [iid, rate] of m.drops) {
+    const it = data.items[iid]; if (!it) continue;
+    if (!map.has(iid)) map.set(iid, { id: iid, ...it, from: [] });
+    map.get(iid).from.push({ name: m.name, rate });
+  }
+  for (const r of map.values()) r.best = Math.max(...r.from.map(f => f.rate));
+  return [...map.values()];
+}
+
+/* =========================================================
+   Economics
+   ========================================================= */
+// Coverage = how many days of total market sales your stock represents.
+function demand(id) {
+  const p = prices[id] || {};
+  if (!(p.sales > 0) || !(p.stock > 0)) return { label: 'Fill in', cls: 'none', days: null };
+  const days = p.stock * 30 / p.sales;
+  if (days <= 1) return { label: 'Strong', cls: 'good', days };
+  if (days <= 2) return { label: 'Moderate', cls: 'warn', days };
+  return { label: 'Weak', cls: 'bad', days };
+}
+const farmValue = id => { const p = prices[id]; return p && p.stock != null && p.price != null ? p.stock * p.price : null; };
+function demandHTML(id) {
+  const d = demand(id);
+  const tip = d.days == null ? 'Enter your stock and 30-day sales' : `Your stock equals ${d.days.toFixed(2)} day(s) of total market sales. Not a guaranteed selling time.`;
+  return `<span class="tag ${d.cls}" title="${esc(tip)}">${d.label}</span>${d.days == null ? '' : `<span class="days">${d.days.toFixed(1)} d of demand</span>`}`;
+}
+
+function summaryHTML(resources) {
+  let total = 0, liquid = 0, missingPrice = 0, stocked = 0;
+  for (const r of resources) {
+    const p = prices[r.id] || {};
+    if (!(p.stock > 0)) continue;
+    stocked++;
+    if (!(p.price > 0)) { missingPrice++; continue; }
+    const v = p.stock * p.price; total += v;
+    if (demand(r.id).cls === 'good') liquid += v;
+  }
+  const share = total > 0 ? liquid / total * 100 : null;
+  const verdict = share == null ? ['Incomplete', ''] : share >= 70 ? ['Good', 'good'] : share >= 40 ? ['Moderate', 'warn'] : ['Watch out', 'bad'];
+  const h = Number(hours[ui.area] || 0);
+  return `<div class="summary" id="summary">
+    <h2>Farm summary</h2>
+    <div class="kpis">
+      <div class="kpi"><small>Total stock value</small><strong>${num(total)} K</strong></div>
+      <div class="kpi"><small>Value selling within ≤ 1 day</small><strong class="${verdict[1]}">${num(liquid)} K</strong></div>
+      <div class="kpi"><small>Liquid share</small><strong class="${verdict[1]}">${share == null ? '—' : share.toFixed(1) + ' %'}</strong></div>
+      <div class="kpi"><small>Market outlook</small><strong class="${verdict[1]}">${verdict[0]}</strong></div>
+    </div>
+    <div class="hours">
+      <label for="hoursIn">Farm duration (hours)</label>
+      <input class="input" id="hoursIn" type="number" min="0" step="0.1" value="${h || ''}" placeholder="e.g. 1.5">
+      <strong>${h > 0 ? 'Gross kamas/hour: ' + num(total / h) + ' K/h' : 'Kamas/hour: —'}</strong>
+    </div>
+    <div class="note">Liquid share = the part of your stock value whose quantity is covered by ≤ 1 day of market sales. Green ≥ 70 %, orange 40–70 %, red &lt; 40 %.${stocked && missingPrice ? ` ${missingPrice} stocked item(s) still need a price.` : ''}</div>
+  </div>`;
+}
+
+/* =========================================================
+   Rendering
+   ========================================================= */
+function renderList() {
+  const q = fold($('search').value.trim());
+  $('modeAreas').classList.toggle('on', ui.mode === 'areas');
+  $('modeMonsters').classList.toggle('on', ui.mode === 'monsters');
+  $('search').placeholder = ui.mode === 'areas' ? 'Search areas… (e.g. Frigost, Astrub)' : 'Search monsters… (e.g. Gobball)';
+  const list = $('list');
+  if (!data) { list.innerHTML = '<div class="empty">No data yet — click “Update data”.</div>'; return; }
+
+  if (ui.mode === 'areas') {
+    const areas = visibleAreas().filter(a => !q || fold(a.name).includes(q) || subsByArea.get(a.id).some(s => fold(s.name).includes(q)));
+    list.innerHTML = areas.length ? areas.map(a => `<button class="row ${a.id === ui.area ? 'on' : ''}" data-area="${a.id}"><span>${esc(a.name)}</span><small>${subsByArea.get(a.id).length} sub-areas</small></button>`).join('')
+      : '<div class="empty">No matching area.</div>';
+    list.querySelectorAll('[data-area]').forEach(b => b.onclick = () => { ui.area = b.dataset.area; ui.sub = 'all'; ui.filter = ''; render(); });
+    return;
+  }
+
+  if (!q) { list.innerHTML = '<div class="empty">Type a monster name to see where it lives.</div>'; return; }
+  const hits = [];
+  for (const [id, m] of Object.entries(data.mobs)) {
+    if (!fold(m.name).includes(q)) continue;
+    const locs = data.subs.filter(s => s.mobs.includes(id) && subsByArea.has(s.area));
+    if (locs.length) hits.push({ m, locs });
+    if (hits.length >= 60) break;
+  }
+  hits.sort((a, b) => a.m.name.localeCompare(b.m.name));
+  list.innerHTML = hits.length ? hits.map(({ m, locs }) => `<div class="hit"><b>${esc(m.name)}</b>${locs.map(s =>
+      `<button data-goarea="${s.area}" data-gosub="${s.id}">${esc(areaById.get(s.area)?.name || '?')} → ${esc(s.name)}</button>`).join('')}</div>`).join('')
+    : '<div class="empty">No matching monster.</div>';
+  list.querySelectorAll('[data-goarea]').forEach(b => b.onclick = () => { ui.area = b.dataset.goarea; ui.sub = b.dataset.gosub; ui.tab = 'mob'; ui.filter = ''; renderMain(); });
+}
+
+function renderMain() {
+  const main = $('main');
+  const area = data && areaById.get(ui.area);
+  if (!area) { main.innerHTML = '<div class="empty">Pick an area on the left.</div>'; return; }
+  const subs = subsByArea.get(area.id) || [];
+  if (ui.sub !== 'all' && !subs.some(s => s.id === ui.sub)) ui.sub = 'all';
+  const mobs = monstersFor(area.id, ui.sub);
+  const res = resourcesFor(mobs);
+  const f = fold(ui.filter);
+
+  let html = `<div class="head"><div><h1>${esc(area.name)}</h1>
+      <div class="meta">${num(mobs.length)} monsters · ${num(res.length)} drops</div></div>
+      <button class="btn" id="csv">⬇ Export CSV</button></div>
+    <div class="chips"><button class="chip ${ui.sub === 'all' ? 'on' : ''}" data-sub="all">Whole area</button>${subs.map(s =>
+      `<button class="chip ${ui.sub === s.id ? 'on' : ''}" data-sub="${s.id}">${s.dungeon ? '🏰 ' : ''}${esc(s.name)}${s.level ? ` <span style="opacity:.6">Lv ${esc(s.level)}</span>` : ''}</button>`).join('')}</div>
+    <div class="tabs"><button data-tab="res" class="${ui.tab === 'res' ? 'on' : ''}">Drops (${res.length})</button><button data-tab="mob" class="${ui.tab === 'mob' ? 'on' : ''}">Monsters (${mobs.length})</button></div>
+    <div class="tools"><input class="input" id="filter" placeholder="Filter ${ui.tab === 'res' ? 'drops or monsters' : 'monsters'}…" value="${esc(ui.filter)}">`;
+
+  if (ui.tab === 'res') {
+    html += `<select class="input" id="cat"><option value="all">All types</option><option value="resource">Resources</option><option value="equipment">Equipment</option><option value="soul">Soul stones</option></select>
+      <select class="input" id="sort"><option value="name">Sort: name</option><option value="rate">Sort: drop rate</option><option value="price">Sort: price</option><option value="sales">Sort: sales / 30 d</option><option value="value">Sort: farm value</option></select></div>`;
+    let rows = res.filter(r => (ui.cat === 'all' || r.cat === ui.cat) && (!f || fold(r.name).includes(f) || r.from.some(x => fold(x.name).includes(f))));
+    const P = id => prices[id] || {};
+    const sorters = {
+      name: (a, b) => a.name.localeCompare(b.name),
+      rate: (a, b) => b.best - a.best,
+      price: (a, b) => (P(b.id).price || 0) - (P(a.id).price || 0),
+      sales: (a, b) => (P(b.id).sales || 0) - (P(a.id).sales || 0),
+      value: (a, b) => (farmValue(b.id) || 0) - (farmValue(a.id) || 0),
+    };
+    rows.sort(sorters[ui.sort] || sorters.name);
+    html += `<div class="scroll"><table><thead><tr>
+        <th style="width:22%">Item</th><th style="width:20%">Dropped by</th><th class="c" style="width:9%">Drop rate</th>
+        <th class="c" title="How many you farmed">Stock</th><th class="c" title="Unit price at the marketplace (HDV)">Price (K)</th>
+        <th class="c" title="Units sold on the market over the last 30 days">Sales / 30 d</th><th class="c">Demand</th><th class="c" title="Stock × unit price">Farm value</th>
+      </tr></thead><tbody>${rows.map(r => {
+        const p = P(r.id);
+        const rates = [...new Set(r.from.map(x => x.rate))];
+        const rateTxt = rates.length === 1 ? pct(rates[0]) : pct(Math.min(...rates)) + ' – ' + pct(Math.max(...rates));
+        return `<tr>
+          <td><div class="item">${r.icon ? `<img loading="lazy" src="${esc(r.icon)}" alt="" onerror="this.style.visibility='hidden'">` : ''}<div><div>${esc(r.name)}</div><div class="sub">${r.level !== '' ? 'Lv ' + esc(r.level) : ''}${r.type ? ' · ' + esc(r.type) : ''}</div></div></div></td>
+          <td class="from" title="${esc(r.from.map(x => x.name + ': ' + pct(x.rate)).join('\n'))}">${esc(r.from.slice(0, 4).map(x => x.name).join(', '))}${r.from.length > 4 ? ' +' + (r.from.length - 4) : ''}</td>
+          <td class="c">${rateTxt}</td>
+          <td class="c"><input type="number" min="0" step="1" data-k="stock" data-id="${r.id}" value="${p.stock ?? ''}" placeholder="0"></td>
+          <td class="c"><input type="number" min="0" data-k="price" data-id="${r.id}" value="${p.price ?? ''}" placeholder="0"></td>
+          <td class="c"><input type="number" min="0" data-k="sales" data-id="${r.id}" value="${p.sales ?? ''}" placeholder="0"></td>
+          <td class="c" data-demand="${r.id}">${demandHTML(r.id)}</td>
+          <td class="c" data-value="${r.id}">${farmValue(r.id) == null ? '—' : num(farmValue(r.id)) + ' K'}</td></tr>`;
+      }).join('')}</tbody></table></div>
+      ${rows.length ? '' : '<div class="empty">Nothing matches.</div>'}
+      <div class="note">Drop rates are base rates (before prospecting/challenges). Drops with a 0 % rate are hidden. Farm value is a gross estimate before marketplace tax, with no guarantee of selling.</div>`;
+    html += summaryHTML(res);
+  } else {
+    html += `</div>`;
+    const rows = mobs.filter(m => !f || fold(m.name).includes(f)).sort((a, b) => a.name.localeCompare(b.name));
+    html += `<div class="scroll"><table><thead><tr><th style="width:28%">Monster</th><th class="c" style="width:10%">Level</th><th>Drops</th><th class="c" style="width:10%">Drop count</th></tr></thead><tbody>${rows.map(m => {
+        const drops = m.drops.map(([id, rate]) => data.items[id] ? data.items[id].name + ' (' + pct(rate) + ')' : null).filter(Boolean);
+        return `<tr><td><div class="item">${m.img ? `<img loading="lazy" src="${esc(m.img)}" alt="" onerror="this.style.visibility='hidden'">` : ''}<span>${esc(m.name)}</span></div></td>
+          <td class="c">${esc(m.level || '—')}</td><td class="from" style="max-width:none">${esc(drops.slice(0, 10).join(' · '))}${drops.length > 10 ? ' …' : ''}</td><td class="c"><b>${drops.length}</b></td></tr>`;
+      }).join('')}</tbody></table></div>${rows.length ? '' : '<div class="empty">Nothing matches.</div>'}`;
+  }
+  main.innerHTML = html;
+  bindMain(area, mobs, res);
+}
+
+function bindMain(area, mobs, res) {
+  const main = $('main');
+  main.querySelectorAll('[data-sub]').forEach(b => b.onclick = () => { ui.sub = b.dataset.sub; renderMain(); });
+  main.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => { ui.tab = b.dataset.tab; ui.filter = ''; renderMain(); });
+  const fi = $('filter');
+  fi.oninput = () => { ui.filter = fi.value; const pos = fi.selectionStart; renderMain(); const n = $('filter'); n.focus(); n.setSelectionRange(pos, pos); };
+  if ($('cat')) { $('cat').value = ui.cat; $('cat').onchange = e => { ui.cat = e.target.value; renderMain(); }; }
+  if ($('sort')) { $('sort').value = ui.sort; $('sort').onchange = e => { ui.sort = e.target.value; renderMain(); }; }
+  main.querySelectorAll('input[data-k]').forEach(inp => inp.oninput = () => {
+    const id = inp.dataset.id, k = inp.dataset.k;
+    prices[id] ??= {};
+    prices[id][k] = inp.value === '' ? null : Math.max(0, Number(inp.value));
+    saveJSON(PRICES_KEY, prices);
+    main.querySelector(`[data-demand="${id}"]`).innerHTML = demandHTML(id);
+    const v = farmValue(id); main.querySelector(`[data-value="${id}"]`).textContent = v == null ? '—' : num(v) + ' K';
+    refreshSummary(res);
+  });
+  bindHours(res);
+  $('csv').onclick = () => exportCSV(area, mobs, res);
+}
+function refreshSummary(res) { const el = $('summary'); if (el) { el.outerHTML = summaryHTML(res); bindHours(res); } }
+function bindHours(res) {
+  const h = $('hoursIn'); if (!h) return;
+  h.onchange = () => { hours[ui.area] = Math.max(0, Number(h.value) || 0); saveJSON(HOURS_KEY, hours); refreshSummary(res); };
+}
+
+function render() { renderList(); renderMain(); }
+
+/* =========================================================
+   Import / export
+   ========================================================= */
+function download(text, filename, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+function exportCSV(area, mobs, res) {
+  const rows = ui.tab === 'res'
+    ? [['Item', 'Type', 'Dropped by', 'Best drop rate %', 'Stock', 'Price (K)', 'Sales / 30 d', 'Demand', 'Coverage (days)', 'Farm value (K)'],
+       ...res.filter(r => ui.cat === 'all' || r.cat === ui.cat).map(r => { const p = prices[r.id] || {}, d = demand(r.id);
+         return [r.name, r.type, r.from.map(x => x.name).join(' | '), r.best, p.stock ?? '', p.price ?? '', p.sales ?? '', d.label, d.days?.toFixed(2) ?? '', farmValue(r.id) ?? '']; })]
+    : [['Monster', 'Level', 'Drops'], ...mobs.map(m => [m.name, m.level, m.drops.map(([id, r]) => (data.items[id]?.name || id) + ' ' + r + '%').join(' | ')])];
+  const csv = rows.map(r => r.map(v => '"' + String(v).replace(/"/g, '""') + '"').join(',')).join('\r\n');
+  download('﻿' + csv, `farm-${area.name.replace(/[^\w-]+/g, '_')}-${ui.tab === 'res' ? 'drops' : 'monsters'}.csv`, 'text/csv;charset=utf-8');
+}
+$('exportPrices').onclick = () => download(JSON.stringify(prices, null, 2), 'dofus-farm-prices.json', 'application/json');
+$('importFile').onchange = async e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  try {
+    let obj = JSON.parse(await file.text());
+    if (obj && obj.prices && typeof obj.prices === 'object') obj = obj.prices;
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('unrecognized file format');
+    const clean = v => v == null || v === '' ? null : (Number.isFinite(+v) && +v >= 0 ? +v : undefined);
+    let n = 0;
+    for (const [id, v] of Object.entries(obj)) {
+      if (!v || typeof v !== 'object') continue;
+      const rec = { price: clean(v.price), sales: clean(v.sales), stock: clean(v.stock) };
+      if (Object.values(rec).includes(undefined)) continue;
+      prices[id] = rec; n++;
+    }
+    if (!n) throw new Error('no valid entries found');
+    saveJSON(PRICES_KEY, prices); renderMain();
+    setStatus(`Imported ${n} price entr${n === 1 ? 'y' : 'ies'}.`, 'ok');
+  } catch (err) { setStatus('Import failed: ' + err.message, 'err'); }
+  finally { e.target.value = ''; }
+};
+
+/* =========================================================
+   Wiring & startup
+   ========================================================= */
+$('search').oninput = renderList;
+$('modeAreas').onclick = () => { ui.mode = 'areas'; $('search').value = ''; renderList(); };
+$('modeMonsters').onclick = () => { ui.mode = 'monsters'; $('search').value = ''; renderList(); };
+$('sync').onclick = sync;
+
+(function start() {
+  data = loadJSON(CACHE_KEY, null);
+  if (data && data.areas && data.subs) {
+    index();
+    ui.area = visibleAreas()[0]?.id ?? null;
+    render();
+    const age = Date.now() - (data.at || 0);
+    setStatus('Loaded saved data from ' + new Date(data.at).toLocaleDateString('en-US') + '.', 'ok');
+    if (age > STALE_MS) sync();
+  } else {
+    data = null; render(); sync();
+  }
+})();
+</script>
+</body>
+</html>
