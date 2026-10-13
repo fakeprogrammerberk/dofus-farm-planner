@@ -107,6 +107,27 @@ a{color:var(--accent)}
 .req button{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-size:12px}
 .req .ok{color:var(--good)}
 .empty{color:var(--dim);text-align:center;padding:30px 14px}
+.step-body{flex:1;min-width:0}
+.step-head{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+.objs{margin:6px 0 4px 28px;display:flex;flex-direction:column;gap:6px}
+.obj{display:flex;gap:10px;align-items:flex-start;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+.obj-text{flex:1;min-width:0;font-size:13px}
+.ref{display:inline-flex;align-items:center;gap:4px;font-weight:600;color:#fff}
+.ref img{width:24px;height:24px;object-fit:contain;vertical-align:middle}
+.ref.npc::before{content:"\1F9D1";font-size:13px}
+.coord{display:inline-flex;align-items:center;gap:4px;margin-top:4px;background:var(--accent-soft);color:var(--accent);border:1px solid #5cc8a855;border-radius:6px;padding:2px 8px;font:600 12px ui-monospace,Consolas,monospace}
+.coord:hover{background:#5cc8a83a}
+.thumb{width:132px;height:74px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:zoom-in;flex:none;background:#0b0d11}
+.start{display:flex;gap:12px;align-items:flex-start;background:var(--accent-soft);border:1px solid #5cc8a840;border-radius:8px;padding:9px 11px;margin-bottom:10px;font-size:13px}
+.start .lbl{color:var(--accent);font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+.loading{color:var(--dim);font-size:12px;padding:4px 0 8px}
+.lightbox{position:fixed;inset:0;z-index:50;background:#000c;display:none;align-items:center;justify-content:center;padding:20px;cursor:zoom-out}
+.lightbox.on{display:flex}
+.lightbox img{max-width:min(1200px,100%);max-height:85vh;border-radius:10px;border:1px solid var(--line)}
+.lightbox .cap{position:absolute;bottom:18px;left:0;right:0;text-align:center;color:#fff;font-weight:600}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#08140f;font-weight:700;padding:8px 14px;border-radius:8px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+@media(max-width:600px){.thumb{width:96px;height:56px}.objs{margin-left:0}}
 .more{display:block;margin:12px auto 0}
 footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
 </style>
@@ -141,6 +162,9 @@ footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
   <section class="card main" id="main"><div class="empty">Loading quests…</div></section>
 </div>
 
+<div class="lightbox" id="lightbox" onclick="this.classList.remove('on')"><img id="lbImg" alt="Map"><div class="cap" id="lbCap"></div></div>
+<div class="toast" id="toast"></div>
+
 <footer>Quest data from <a href="https://dofusdb.fr" target="_blank" rel="noopener">DofusDB</a>. Your progress is saved automatically in this browser — use Export progress to back it up.</footer>
 
 <script>
@@ -150,7 +174,8 @@ footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
    ========================================================= */
 const API = 'https://api.dofusdb.fr';
 const LANG = 'en';
-const CACHE_KEY = 'dqt-data-v1';
+const CACHE_KEY = 'dqt-data-v2';
+const DETAIL_KEY = 'dqt-details-v1';
 const PROGRESS_KEY = 'dqt-progress';
 const PREFS_KEY = 'dqt-prefs';
 const STALE_MS = 7 * 24 * 3600 * 1000;
@@ -231,7 +256,7 @@ async function sync() {
     const nm = ['name.' + LANG, 'name.fr'];
     const [cats, quests, steps] = await Promise.all([
       fetchAll('quest-categories', ['id', 'order', ...nm], 'categories'),
-      fetchAll('quests', ['id', 'categoryId', 'levelMin', 'levelMax', 'isDungeonQuest', 'isEvent', 'repeatType', 'need.quests', 'stepIds', ...nm], 'quests'),
+      fetchAll('quests', ['id', 'categoryId', 'levelMin', 'levelMax', 'isDungeonQuest', 'isEvent', 'repeatType', 'need.quests', 'stepIds', 'startPosition', ...nm], 'quests'),
       fetchAll('quest-steps', ['id', 'questId', 'optimalLevel', 'description.' + LANG, ...nm], 'quest steps'),
     ]);
     const stepMap = {};
@@ -245,6 +270,7 @@ async function sync() {
         dungeon: !!q.isDungeonQuest, event: !!q.isEvent, repeat: Number(q.repeatType) > 0,
         needs: (q.need?.quests || []).map(String),
         steps: (q.stepIds || []).map(String).filter(id => stepMap[id]),
+        start: q.startPosition?.[0] ? { map: q.startPosition[0].mapId || 0, npc: q.startPosition[0].npcId || 0 } : null,
       };
     }
     data = {
@@ -307,6 +333,112 @@ function stats(ids) {
 }
 
 /* =========================================================
+   Quest details: objectives, coordinates, maps, pictures
+   (loaded when a quest is opened, then cached)
+   ========================================================= */
+let details = loadJSON(DETAIL_KEY, {});
+const detailErr = {};
+const loadingDetail = new Set();
+const mapImg = (map, scale = '0.25') => `${API}/img/maps/${scale}/${map}.jpg`;
+
+async function fetchByIds(path, ids, fields) {
+  const out = [];
+  const list = [...new Set(ids.map(String))];
+  for (let i = 0; i < list.length; i += 50) {
+    const chunk = list.slice(i, i + 50);
+    const j = await getJSON(buildURL(path, [['$limit', '50'], ...chunk.map(id => ['id[$in][]', id]), ...fields.map(f => ['$select[]', f])]));
+    out.push(...j.data);
+  }
+  return out;
+}
+
+async function loadDetail(qid) {
+  if (details[qid] || loadingDetail.has(qid)) return;
+  const q = data.quests[qid];
+  loadingDetail.add(qid);
+  try {
+    // 1. Objectives for every step of the quest.
+    const objs = [];
+    if (q.steps.length) {
+      for (let skip = 0; ; skip += 50) {
+        const j = await getJSON(buildURL('quest-objectives', [['$limit', '50'], ['$skip', String(skip)], ...q.steps.map(id => ['stepId[$in][]', id]),
+          ...['id', 'stepId', 'text.' + LANG, 'text.fr', 'coords', 'mapId'].map(f => ['$select[]', f])]));
+        objs.push(...j.data);
+        if (!j.data.length || objs.length >= (j.total ?? 0)) break;
+      }
+    }
+    // 2. Collect what the objective texts refer to: {npc,ID} {item,ID} {monster,ID}
+    const refIds = { npc: new Set(), item: new Set(), monster: new Set() };
+    for (const o of objs) for (const [, type, rid] of name(o.text).matchAll(/\{(\w+),(\d+)[^}]*\}/g)) refIds[type]?.add(rid);
+    if (q.start?.npc) refIds.npc.add(String(q.start.npc));
+    const needPos = new Set(objs.filter(o => !o.coords && o.mapId).map(o => o.mapId));
+    if (q.start?.map) needPos.add(q.start.map);
+    // 3. Resolve names, pictures and map coordinates in parallel.
+    const [npcs, items, mons, pos] = await Promise.all([
+      refIds.npc.size ? fetchByIds('npcs', [...refIds.npc], ['id', 'name.' + LANG, 'name.fr']) : [],
+      refIds.item.size ? fetchByIds('items', [...refIds.item], ['id', 'name.' + LANG, 'name.fr', 'iconId']) : [],
+      refIds.monster.size ? fetchByIds('monsters', [...refIds.monster], ['id', 'name.' + LANG, 'name.fr', 'gfxId']) : [],
+      needPos.size ? fetchByIds('map-positions', [...needPos], ['id', 'posX', 'posY']) : [],
+    ]);
+    const refs = { npc: {}, item: {}, monster: {} };
+    for (const n of npcs) refs.npc[n.id] = { n: name(n.name) };
+    for (const i of items) refs.item[i.id] = { n: name(i.name), img: i.iconId != null ? `${API}/img/items/${i.iconId}.png` : '' };
+    for (const m of mons) refs.monster[m.id] = { n: name(m.name), img: m.gfxId != null ? `${API}/img/monsters/${m.gfxId}.png` : '' };
+    const posById = new Map(pos.map(p => [p.id, p]));
+    const coordsOf = (map, c) => c && Number.isFinite(c.x) ? [c.x, c.y] : (posById.has(map) ? [posById.get(map).posX, posById.get(map).posY] : null);
+
+    const steps = {};
+    for (const o of objs.sort((a, b) => a.id - b.id))
+      (steps[o.stepId] ??= []).push({ t: name(o.text), xy: coordsOf(o.mapId, o.coords), map: o.mapId || 0 });
+    const start = q.start ? { npc: q.start.npc ? String(q.start.npc) : '', map: q.start.map || 0, xy: coordsOf(q.start.map, null) } : null;
+    details[qid] = { steps, start, refs };
+    if (!saveJSON(DETAIL_KEY, details)) { details = { [qid]: details[qid] }; saveJSON(DETAIL_KEY, details); }
+  } catch (e) {
+    console.error(e);
+    detailErr[qid] = e.message;
+  } finally {
+    loadingDetail.delete(qid);
+    if (open.has(qid)) refreshQuest(qid, true);
+  }
+}
+
+function refHTML(det, type, rid) {
+  const r = det.refs[type]?.[rid];
+  if (!r) return `<b>${esc(type)} #${esc(rid)}</b>`;
+  return `<span class="ref ${type}">${r.img ? `<img src="${esc(r.img)}" alt="" loading="lazy" onerror="this.remove()">` : ''}${esc(r.n)}</span>`;
+}
+// Escape the text, then replace {type,id} placeholders with names and pictures.
+const objText = (det, t) => esc(t).replace(/\{(\w+),(\d+)[^}]*\}/g, (_, type, rid) => refHTML(det, type, rid));
+function coordHTML(xy) {
+  if (!xy) return '';
+  return `<button class="coord" data-travel="${xy[0]},${xy[1]}" title="Copy /travel ${xy[0]},${xy[1]} — paste it in the game chat">📍 [${xy[0]}, ${xy[1]}]</button>`;
+}
+function thumbHTML(map, cap) {
+  return map ? `<img class="thumb" src="${mapImg(map)}" alt="Map" loading="lazy" data-zoom="${map}" data-cap="${esc(cap)}" title="Click to enlarge" onerror="this.remove()">` : '';
+}
+function startHTML(det) {
+  const s = det.start;
+  if (!s || (!s.npc && !s.xy)) return '';
+  const who = s.npc ? refHTML(det, 'npc', s.npc) : 'the quest giver';
+  return `<div class="start"><div style="flex:1"><div class="lbl">Start</div>Talk to ${who}<br>${coordHTML(s.xy)}</div>${thumbHTML(s.map, 'Quest start' + (s.xy ? ` [${s.xy.join(', ')}]` : ''))}</div>`;
+}
+function objsHTML(det, sid) {
+  const list = det.steps[sid];
+  if (!list?.length) return '';
+  return `<div class="objs">${list.map(o => `<div class="obj"><div class="obj-text">${objText(det, o.t)}${o.xy ? '<br>' + coordHTML(o.xy) : ''}</div>${thumbHTML(o.map, o.xy ? `[${o.xy.join(', ')}]` : 'Map')}</div>`).join('')}</div>`;
+}
+
+function copyTravel(xy) {
+  const cmd = '/travel ' + xy;
+  const done = () => toast('Copied “' + cmd + '” — paste it in the game chat');
+  if (navigator.clipboard?.writeText) navigator.clipboard.writeText(cmd).then(done, () => prompt('Copy this:', cmd));
+  else prompt('Copy this:', cmd);
+}
+let toastTimer;
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
+function zoom(map, cap) { $('lbImg').src = mapImg(map, '0.5'); $('lbCap').textContent = cap || ''; $('lightbox').classList.add('on'); }
+
+/* =========================================================
    Rendering
    ========================================================= */
 function renderOverall() {
@@ -357,9 +489,11 @@ function questHTML(id) {
   let detail = '';
   if (isOpen) {
     const needs = q.needs.filter(n => data.quests[n]);
+    const det = details[id];
     detail = `<div class="detail">${needs.length ? `<div class="req">Requires: ${needs.map(n => `<button data-jump="${n}">${esc(data.quests[n].name)}</button>${state(n) === 'done' ? ' <span class="ok">✓</span>' : ''}`).join(', ')}</div>` : ''}
+      ${det ? startHTML(det) : `<div class="loading">${detailErr[id] ? 'Could not load objectives &amp; coordinates (' + esc(detailErr[id]) + '). Close and reopen the quest to retry.' : 'Loading objectives, coordinates and maps…'}</div>`}
       ${q.steps.length ? q.steps.map(sid => { const st = data.steps[sid], d = stepDone(id, sid);
-        return `<label class="step ${d ? 'done' : ''}"><input type="checkbox" class="box" data-step="${sid}" data-q="${id}" ${d ? 'checked' : ''}><div><div class="step-name">${esc(st.name)}${st.level ? ` <span class="pill">Lv ${esc(st.level)}</span>` : ''}</div>${st.desc ? `<div class="step-desc">${esc(st.desc)}</div>` : ''}</div></label>`; }).join('')
+        return `<div class="step ${d ? 'done' : ''}"><div class="step-body"><label class="step-head"><input type="checkbox" class="box" data-step="${sid}" data-q="${id}" ${d ? 'checked' : ''}><div><div class="step-name">${esc(st.name)}${st.level ? ` <span class="pill">Lv ${esc(st.level)}</span>` : ''}</div>${st.desc ? `<div class="step-desc">${esc(st.desc)}</div>` : ''}</div></label>${det ? objsHTML(det, sid) : ''}</div></div>`; }).join('')
         : '<div class="step-desc">No step details available for this quest.</div>'}</div>`;
   }
   return `<div class="quest ${s === 'done' ? 'done' : ''} ${isOpen ? 'open' : ''}" id="q-${id}">
@@ -415,7 +549,9 @@ function bindMain() {
   };
   m.querySelectorAll('[data-quest]').forEach(b => b.onchange = () => { setQuest(b.dataset.quest, b.checked); refreshQuest(b.dataset.quest); });
   m.querySelectorAll('[data-step]').forEach(b => b.onchange = () => { toggleStep(b.dataset.q, b.dataset.step); refreshQuest(b.dataset.q); });
-  m.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); refreshQuest(id, true); });
+  m.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.toggle; if (open.has(id)) open.delete(id); else { open.add(id); delete detailErr[id]; loadDetail(id); } refreshQuest(id, true); });
+  m.querySelectorAll('[data-travel]').forEach(b => b.onclick = e => { e.preventDefault(); copyTravel(b.dataset.travel); });
+  m.querySelectorAll('[data-zoom]').forEach(b => b.onclick = e => { e.preventDefault(); zoom(b.dataset.zoom, b.dataset.cap); });
   m.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => jumpTo(b.dataset.jump));
 }
 
@@ -437,7 +573,7 @@ function jumpTo(id) {
   prefs.cat = q.cat; prefs.q = q.name; prefs.status = 'all'; prefs.min = ''; prefs.max = '';
   if (q.event) prefs.hideEvents = false;
   if (q.repeat) prefs.hideRepeat = false;
-  savePrefs(); open.add(id); shown = PAGE; render();
+  savePrefs(); open.add(id); loadDetail(id); shown = PAGE; render();
   $('q-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
@@ -486,6 +622,7 @@ $('importFile').onchange = async e => {
    Startup
    ========================================================= */
 $('catSearch').oninput = renderCats;
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('lightbox').classList.remove('on'); });
 $('sync').onclick = sync;
 (function start() {
   data = loadJSON(CACHE_KEY, null);
