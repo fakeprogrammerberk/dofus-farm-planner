@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dofus Quest Tracker</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a21;--surface2:#1e222b;--line:#2c313c;
+  --text:#e9ebf0;--dim:#9aa1b0;--accent:#5cc8a8;--accent-soft:#5cc8a822;
+  --good:#5fd38d;--warn:#e8b54a;--bad:#ef6f6f;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- top bar ---------- */
+.bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#0f1115f2;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.logo{font-weight:700;font-size:18px}
+.logo span{color:var(--accent)}
+.nav{display:flex;gap:4px;margin-right:auto}
+.nav a{padding:6px 10px;border-radius:8px;color:var(--dim);text-decoration:none;font-size:13px;font-weight:600}
+.nav a:hover{color:var(--text)}
+.nav a.on{color:var(--accent);background:var(--accent-soft)}
+.status{font-size:12px;color:var(--dim);max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--good)}
+.btn{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.5;cursor:wait}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#08140f}
+.btn.danger{color:var(--bad);border-color:#ef6f6f55}
+.btn.danger:hover{border-color:var(--bad);background:#ef6f6f14}
+
+/* ---------- overall progress ---------- */
+.overall{max-width:1500px;margin:18px auto 0;padding:0 20px}
+.overall .card{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 18px}
+.overall .big{font-size:26px;font-weight:700}
+.overall .label{color:var(--dim);font-size:12px}
+.overall .grow{flex:1 1 300px}
+.meter{height:8px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .25s}
+.counts{display:flex;gap:16px;color:var(--dim);font-size:12px;margin-top:6px;flex-wrap:wrap}
+.counts b{color:var(--text)}
+
+/* ---------- layout ---------- */
+.layout{display:grid;grid-template-columns:290px 1fr;gap:18px;max-width:1500px;margin:0 auto;padding:18px 20px 60px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+
+.side{display:flex;flex-direction:column;max-height:calc(100vh - 90px);position:sticky;top:76px}
+@media(max-width:900px){.side{position:static;max-height:380px}}
+.side-top{padding:14px;border-bottom:1px solid var(--line)}
+.input{width:100%;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+.input:focus{outline:none;border-color:var(--accent)}
+.list{overflow:auto;padding:6px}
+.cat{display:block;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:8px;padding:8px 10px}
+.cat:hover{background:var(--surface2)}
+.cat.on{background:var(--accent-soft);border-color:#5cc8a855}
+.cat .top{display:flex;justify-content:space-between;gap:8px;margin-bottom:5px}
+.cat small{color:var(--dim);font-size:11px;white-space:nowrap}
+.cat .meter{height:4px}
+.cat.complete small{color:var(--good)}
+
+.main{min-width:0;padding:18px}
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.head h1{margin:0;font-size:22px}
+.meta{color:var(--dim);font-size:13px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.tools .input{width:auto}
+.tools .search{flex:1 1 220px}
+.tools .lv{width:84px}
+.check{display:flex;align-items:center;gap:6px;color:var(--dim);font-size:13px;user-select:none}
+
+/* ---------- quests ---------- */
+.quest{border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--surface2)}
+.quest.done{opacity:.62}
+.quest.done .qname{text-decoration:line-through;text-decoration-color:#ffffff40}
+.qrow{display:flex;align-items:center;gap:10px;padding:9px 12px}
+.box{appearance:none;width:20px;height:20px;flex:none;border:2px solid #4a5160;border-radius:6px;background:var(--bg);cursor:pointer;display:grid;place-content:center;margin:0}
+.box:checked{background:var(--accent);border-color:var(--accent)}
+.box:checked::after{content:"";width:5px;height:10px;border:solid #08140f;border-width:0 2px 2px 0;transform:rotate(45deg) translate(-1px,-1px)}
+.box.partial{border-color:var(--warn)}
+.box.partial::after{content:"";width:8px;height:2px;background:var(--warn)}
+.qmain{flex:1;min-width:0;cursor:pointer}
+.qname{font-weight:600}
+.qsub{color:var(--dim);font-size:12px;display:flex;gap:8px;flex-wrap:wrap;margin-top:1px}
+.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;background:#ffffff0d;color:var(--dim)}
+.pill.prog{color:var(--warn);background:#e8b54a1a}
+.pill.ok{color:var(--good);background:#5fd38d1a}
+.pill.lock{color:var(--bad);background:#ef6f6f14}
+.chev{color:var(--dim);background:none;border:0;padding:4px 6px;font-size:14px;transition:transform .15s}
+.quest.open .chev{transform:rotate(90deg)}
+.detail{display:none;border-top:1px solid var(--line);padding:10px 12px 12px 42px}
+.quest.open .detail{display:block}
+.step{display:flex;gap:10px;align-items:flex-start;padding:6px 0}
+.step .box{width:18px;height:18px;margin-top:1px}
+.step .box:checked::after{width:4px;height:9px}
+.step-name{font-weight:600;font-size:13px}
+.step.done .step-name{text-decoration:line-through;color:var(--dim)}
+.step-desc{color:var(--dim);font-size:12px}
+.req{font-size:12px;color:var(--dim);margin-bottom:6px}
+.req button{background:none;border:0;padding:0;color:var(--accent);text-decoration:underline;font-size:12px}
+.req .ok{color:var(--good)}
+.empty{color:var(--dim);text-align:center;padding:30px 14px}
+.more{display:block;margin:12px auto 0}
+footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo">Dofus <span>Quest Tracker</span></div>
+  <nav class="nav"><a href="index.html">Farm Planner</a><a href="quests.html" class="on">Quests</a></nav>
+  <span class="status" id="status">Starting…</span>
+  <button class="btn" id="sync" title="Download the latest quest list from DofusDB">↻ Update quests</button>
+  <button class="btn" id="exportBtn" title="Save your progress to a backup file">Export progress</button>
+  <label class="btn" title="Load progress from a backup file">Import progress<input id="importFile" type="file" accept=".json,application/json" hidden></label>
+  <button class="btn danger" id="resetBtn" title="Clear all quest progress">Reset progress</button>
+</div>
+
+<div class="overall">
+  <div class="card">
+    <div><div class="big" id="ovPct">0%</div><div class="label">overall completion</div></div>
+    <div class="grow">
+      <div class="meter"><i id="ovBar" style="width:0"></i></div>
+      <div class="counts" id="ovCounts"></div>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <aside class="card side">
+    <div class="side-top"><input class="input" id="catSearch" placeholder="Search categories…" autocomplete="off"></div>
+    <div class="list" id="cats"><div class="empty">Loading…</div></div>
+  </aside>
+  <section class="card main" id="main"><div class="empty">Loading quests…</div></section>
+</div>
+
+<footer>Quest data from <a href="https://dofusdb.fr" target="_blank" rel="noopener">DofusDB</a>. Your progress is saved automatically in this browser — use Export progress to back it up.</footer>
+
+<script>
+'use strict';
+/* =========================================================
+   Config & helpers
+   ========================================================= */
+const API = 'https://api.dofusdb.fr';
+const LANG = 'en';
+const CACHE_KEY = 'dqt-data-v1';
+const PROGRESS_KEY = 'dqt-progress';
+const PREFS_KEY = 'dqt-prefs';
+const STALE_MS = 7 * 24 * 3600 * 1000;
+const PAGE = 80;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = n => Number(n || 0).toLocaleString('en-US');
+const name = o => (o && typeof o === 'object') ? (o[LANG] || o.fr || '') : (o || '');
+const fold = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+function loadJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true } catch { return false } }
+function setStatus(msg, kind = '') { const el = $('status'); el.textContent = msg; el.title = msg; el.className = 'status ' + kind; }
+
+/* =========================================================
+   State
+   ========================================================= */
+// data = { at, cats:[{id,name,order}], quests:{id:{name,cat,min,max,dungeon,event,repeat,needs:[],steps:[stepId]}}, steps:{id:{name,desc,level}} }
+let data = null;
+// progress = { questId: { done:true } | { steps:[stepId,...] } }
+let progress = loadJSON(PROGRESS_KEY, {});
+const prefs = Object.assign({ cat: 'all', status: 'all', q: '', min: '', max: '', hideEvents: true, hideRepeat: false }, loadJSON(PREFS_KEY, {}));
+let shown = PAGE;
+const open = new Set();
+
+function saveProgress() {
+  if (!saveJSON(PROGRESS_KEY, progress)) setStatus('Could not save progress — browser storage is full or blocked.', 'err');
+}
+const savePrefs = () => saveJSON(PREFS_KEY, prefs);
+
+/* =========================================================
+   DofusDB fetching
+   ========================================================= */
+async function getJSON(url, tries = 3) {
+  for (let i = 0; ; i++) {
+    try {
+      const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), 30000);
+      const r = await fetch(url, { signal: ctl.signal, headers: { Accept: 'application/json' } });
+      clearTimeout(t);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return await r.json();
+    } catch (e) {
+      if (i >= tries - 1) throw e;
+      await new Promise(res => setTimeout(res, 800 * (i + 1)));
+    }
+  }
+}
+function buildURL(path, params) {
+  const u = new URL(API + '/' + path);
+  for (const [k, v] of params) u.searchParams.append(k, v);
+  return u;
+}
+async function pool(jobs, limit, onDone) {
+  const out = new Array(jobs.length); let next = 0, done = 0;
+  async function worker() { while (next < jobs.length) { const i = next++; out[i] = await jobs[i](); onDone?.(++done, jobs.length); } }
+  await Promise.all(Array.from({ length: Math.min(limit, jobs.length) }, worker));
+  return out;
+}
+async function fetchAll(path, fields, label) {
+  const sel = fields.map(f => ['$select[]', f]);
+  const first = await getJSON(buildURL(path, [['$limit', '50'], ['$skip', '0'], ...sel]));
+  const rows = [...first.data];
+  const size = first.data.length || 50, total = first.total ?? rows.length;
+  const jobs = [];
+  for (let skip = size; skip < total; skip += size)
+    jobs.push(() => getJSON(buildURL(path, [['$limit', '50'], ['$skip', String(skip)], ...sel])).then(j => j.data));
+  const pages = await pool(jobs, 6, (d, n) => setStatus(`Downloading ${label}… ${Math.round(d / n * 100)}%`));
+  for (const p of pages) rows.push(...p);
+  return rows;
+}
+
+let syncing = false;
+async function sync() {
+  if (syncing) return;
+  syncing = true; $('sync').disabled = true;
+  try {
+    setStatus('Connecting to DofusDB…');
+    const nm = ['name.' + LANG, 'name.fr'];
+    const [cats, quests, steps] = await Promise.all([
+      fetchAll('quest-categories', ['id', 'order', ...nm], 'categories'),
+      fetchAll('quests', ['id', 'categoryId', 'levelMin', 'levelMax', 'isDungeonQuest', 'isEvent', 'repeatType', 'need.quests', 'stepIds', ...nm], 'quests'),
+      fetchAll('quest-steps', ['id', 'questId', 'optimalLevel', 'description.' + LANG, ...nm], 'quest steps'),
+    ]);
+    const stepMap = {};
+    for (const s of steps) stepMap[s.id] = { name: name(s.name) || 'Step ' + s.id, desc: name(s.description), level: s.optimalLevel ?? '' };
+    const questMap = {};
+    for (const q of quests) {
+      const qn = name(q.name);
+      if (!qn) continue;
+      questMap[q.id] = {
+        name: qn, cat: String(q.categoryId ?? ''), min: q.levelMin ?? 0, max: q.levelMax ?? 0,
+        dungeon: !!q.isDungeonQuest, event: !!q.isEvent, repeat: Number(q.repeatType) > 0,
+        needs: (q.need?.quests || []).map(String),
+        steps: (q.stepIds || []).map(String).filter(id => stepMap[id]),
+      };
+    }
+    data = {
+      at: Date.now(),
+      cats: cats.map(c => ({ id: String(c.id), name: name(c.name) || 'Category ' + c.id, order: c.order ?? 999 })),
+      quests: questMap, steps: stepMap,
+    };
+    const saved = saveJSON(CACHE_KEY, data);
+    index(); render();
+    setStatus(`Updated: ${num(Object.keys(questMap).length)} quests in ${data.cats.length} categories.` + (saved ? '' : ' (Too large to cache offline.)'), 'ok');
+  } catch (e) {
+    console.error(e);
+    setStatus('Update failed: ' + e.message + (data ? ' — showing cached quests.' : ' — check your internet connection and retry.'), 'err');
+  } finally { syncing = false; $('sync').disabled = false; }
+}
+
+/* =========================================================
+   Indexes & progress logic
+   ========================================================= */
+let byCat = new Map(), allIds = [];
+function index() {
+  byCat = new Map(data.cats.map(c => [c.id, []]));
+  allIds = Object.keys(data.quests);
+  for (const id of allIds) { const q = data.quests[id]; if (!byCat.has(q.cat)) byCat.set(q.cat, []); byCat.get(q.cat).push(id); }
+  for (const list of byCat.values()) list.sort(sortQuests);
+  allIds.sort(sortQuests);
+}
+function sortQuests(a, b) { const A = data.quests[a], B = data.quests[b]; return (A.min - B.min) || A.name.localeCompare(B.name); }
+
+function state(id) {
+  const p = progress[id], q = data.quests[id];
+  if (!p) return 'todo';
+  if (p.done) return 'done';
+  if (p.steps?.length) return p.steps.length >= q.steps.length && q.steps.length ? 'done' : 'progress';
+  return 'todo';
+}
+const stepDone = (qid, sid) => { const p = progress[qid]; return !!p && (p.done || (p.steps || []).includes(sid)); };
+const unlocked = id => data.quests[id].needs.every(n => !data.quests[n] || state(n) === 'done');
+
+function setQuest(id, done) {
+  if (done) progress[id] = { done: true }; else delete progress[id];
+  saveProgress();
+}
+function toggleStep(qid, sid) {
+  const q = data.quests[qid];
+  const cur = new Set(progress[qid]?.done ? q.steps : (progress[qid]?.steps || []));
+  cur.has(sid) ? cur.delete(sid) : cur.add(sid);
+  if (!cur.size) delete progress[qid];
+  else if (cur.size >= q.steps.length) progress[qid] = { done: true };
+  else progress[qid] = { steps: [...cur] };
+  saveProgress();
+}
+
+// Quests that pass the "hide events / repeatable" toggles — these count toward progress.
+const counted = id => { const q = data.quests[id]; return !(prefs.hideEvents && q.event) && !(prefs.hideRepeat && q.repeat); };
+function stats(ids) {
+  let done = 0, prog = 0, total = 0;
+  for (const id of ids) { if (!counted(id)) continue; total++; const s = state(id); if (s === 'done') done++; else if (s === 'progress') prog++; }
+  return { done, prog, total, pct: total ? done / total * 100 : 0 };
+}
+
+/* =========================================================
+   Rendering
+   ========================================================= */
+function renderOverall() {
+  const s = stats(allIds);
+  $('ovPct').textContent = s.pct.toFixed(1) + '%';
+  $('ovBar').style.width = s.pct + '%';
+  $('ovCounts').innerHTML = `<span><b>${num(s.done)}</b> completed</span><span><b>${num(s.prog)}</b> in progress</span><span><b>${num(s.total - s.done - s.prog)}</b> not started</span><span><b>${num(s.total)}</b> total</span>`;
+}
+
+function renderCats() {
+  const q = fold($('catSearch').value.trim());
+  const all = stats(allIds);
+  const cats = data.cats.filter(c => byCat.get(c.id)?.length && (!q || fold(c.name).includes(q))).sort((a, b) => a.name.localeCompare(b.name));
+  const row = (id, label, s) => `<button class="cat ${prefs.cat === id ? 'on' : ''} ${s.total && s.done === s.total ? 'complete' : ''}" data-cat="${id}">
+      <div class="top"><span>${esc(label)}</span><small>${s.done}/${s.total}${s.total && s.done === s.total ? ' ✓' : ''}</small></div>
+      <div class="meter"><i style="width:${s.pct}%"></i></div></button>`;
+  $('cats').innerHTML = (q ? '' : row('all', 'All quests', all)) + cats.map(c => row(c.id, c.name, stats(byCat.get(c.id)))).join('');
+  $('cats').querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { prefs.cat = b.dataset.cat; savePrefs(); shown = PAGE; renderCats(); renderMain(); });
+}
+
+function filtered() {
+  const ids = prefs.cat === 'all' ? allIds : (byCat.get(prefs.cat) || []);
+  const f = fold(prefs.q), min = prefs.min === '' ? -1 : +prefs.min, max = prefs.max === '' ? Infinity : +prefs.max;
+  return ids.filter(id => {
+    const q = data.quests[id];
+    if (!counted(id)) return false;
+    if (f && !fold(q.name).includes(f)) return false;
+    if (q.max < min || q.min > max) return false;
+    const s = state(id);
+    if (prefs.status === 'todo' && s === 'done') return false;
+    if (prefs.status === 'progress' && s !== 'progress') return false;
+    if (prefs.status === 'done' && s !== 'done') return false;
+    if (prefs.status === 'available' && (s === 'done' || !unlocked(id))) return false;
+    return true;
+  });
+}
+
+function questHTML(id) {
+  const q = data.quests[id], s = state(id), isOpen = open.has(id);
+  const doneSteps = progress[id]?.done ? q.steps.length : (progress[id]?.steps?.length || 0);
+  const lv = q.min && q.max && q.min !== q.max ? `Lv ${q.min}–${q.max}` : `Lv ${q.min || q.max || '?'}`;
+  const pills = [
+    s === 'done' ? '<span class="pill ok">Completed</span>' : s === 'progress' ? `<span class="pill prog">${doneSteps}/${q.steps.length} steps</span>` : '',
+    s !== 'done' && !unlocked(id) ? '<span class="pill lock">Locked</span>' : '',
+    q.dungeon ? '<span class="pill">Dungeon</span>' : '', q.repeat ? '<span class="pill">Repeatable</span>' : '', q.event ? '<span class="pill">Event</span>' : '',
+  ].join('');
+  const catName = prefs.cat === 'all' ? (data.cats.find(c => c.id === q.cat)?.name || '') : '';
+  let detail = '';
+  if (isOpen) {
+    const needs = q.needs.filter(n => data.quests[n]);
+    detail = `<div class="detail">${needs.length ? `<div class="req">Requires: ${needs.map(n => `<button data-jump="${n}">${esc(data.quests[n].name)}</button>${state(n) === 'done' ? ' <span class="ok">✓</span>' : ''}`).join(', ')}</div>` : ''}
+      ${q.steps.length ? q.steps.map(sid => { const st = data.steps[sid], d = stepDone(id, sid);
+        return `<label class="step ${d ? 'done' : ''}"><input type="checkbox" class="box" data-step="${sid}" data-q="${id}" ${d ? 'checked' : ''}><div><div class="step-name">${esc(st.name)}${st.level ? ` <span class="pill">Lv ${esc(st.level)}</span>` : ''}</div>${st.desc ? `<div class="step-desc">${esc(st.desc)}</div>` : ''}</div></label>`; }).join('')
+        : '<div class="step-desc">No step details available for this quest.</div>'}</div>`;
+  }
+  return `<div class="quest ${s === 'done' ? 'done' : ''} ${isOpen ? 'open' : ''}" id="q-${id}">
+    <div class="qrow">
+      <input type="checkbox" class="box ${s === 'progress' ? 'partial' : ''}" data-quest="${id}" ${s === 'done' ? 'checked' : ''} title="Mark quest as completed">
+      <div class="qmain" data-toggle="${id}"><div class="qname">${esc(q.name)}</div>
+        <div class="qsub"><span>${lv}</span>${catName ? `<span>· ${esc(catName)}</span>` : ''}${q.steps.length ? `<span>· ${q.steps.length} step${q.steps.length > 1 ? 's' : ''}</span>` : ''}${pills}</div></div>
+      <button class="chev" data-toggle="${id}" aria-label="Show steps">▶</button>
+    </div>${detail}</div>`;
+}
+
+function renderMain() {
+  if (!data) { $('main').innerHTML = '<div class="empty">No quest data yet — click “Update quests”.</div>'; return; }
+  const title = prefs.cat === 'all' ? 'All quests' : (data.cats.find(c => c.id === prefs.cat)?.name || 'Quests');
+  const scope = prefs.cat === 'all' ? allIds : (byCat.get(prefs.cat) || []);
+  const s = stats(scope);
+  const list = filtered();
+  $('main').innerHTML = `
+    <div class="head"><div><h1>${esc(title)}</h1><div class="meta">${s.done} of ${s.total} completed (${s.pct.toFixed(1)}%) · ${s.prog} in progress</div></div>
+      ${prefs.cat !== 'all' ? '<button class="btn danger" id="resetCat" title="Clear progress for this category only">Reset this category</button>' : ''}</div>
+    <div class="meter" style="margin-bottom:14px"><i style="width:${s.pct}%"></i></div>
+    <div class="tools">
+      <input class="input search" id="q" placeholder="Search quests…" value="${esc(prefs.q)}">
+      <select class="input" id="st">
+        <option value="all">All</option><option value="available">Available now</option><option value="todo">Not completed</option>
+        <option value="progress">In progress</option><option value="done">Completed</option></select>
+      <input class="input lv" id="min" type="number" min="0" placeholder="Min lv" value="${esc(prefs.min)}">
+      <input class="input lv" id="max" type="number" min="0" placeholder="Max lv" value="${esc(prefs.max)}">
+      <label class="check"><input type="checkbox" id="hideEvents" ${prefs.hideEvents ? 'checked' : ''}> Hide events</label>
+      <label class="check"><input type="checkbox" id="hideRepeat" ${prefs.hideRepeat ? 'checked' : ''}> Hide repeatable</label>
+    </div>
+    <div id="qlist">${list.slice(0, shown).map(questHTML).join('') || '<div class="empty">No quests match these filters.</div>'}</div>
+    ${list.length > shown ? `<button class="btn more" id="more">Show more (${num(list.length - shown)} left)</button>` : ''}`;
+  bindMain();
+}
+
+function bindMain() {
+  const m = $('main');
+  $('st').value = prefs.status;
+  const refilter = () => { savePrefs(); shown = PAGE; renderMain(); };
+  $('q').oninput = e => { prefs.q = e.target.value; const pos = e.target.selectionStart; refilter(); const n = $('q'); n.focus(); n.setSelectionRange(pos, pos); };
+  $('st').onchange = e => { prefs.status = e.target.value; refilter(); };
+  $('min').onchange = e => { prefs.min = e.target.value; refilter(); };
+  $('max').onchange = e => { prefs.max = e.target.value; refilter(); };
+  $('hideEvents').onchange = e => { prefs.hideEvents = e.target.checked; savePrefs(); render(); };
+  $('hideRepeat').onchange = e => { prefs.hideRepeat = e.target.checked; savePrefs(); render(); };
+  if ($('more')) $('more').onclick = () => { shown += PAGE; renderMain(); };
+  if ($('resetCat')) $('resetCat').onclick = () => {
+    const name = data.cats.find(c => c.id === prefs.cat)?.name;
+    if (!confirm(`Reset all progress in “${name}”? This can't be undone.`)) return;
+    for (const id of byCat.get(prefs.cat) || []) delete progress[id];
+    saveProgress(); render(); setStatus(`Progress reset for ${name}.`, 'ok');
+  };
+  m.querySelectorAll('[data-quest]').forEach(b => b.onchange = () => { setQuest(b.dataset.quest, b.checked); refreshQuest(b.dataset.quest); });
+  m.querySelectorAll('[data-step]').forEach(b => b.onchange = () => { toggleStep(b.dataset.q, b.dataset.step); refreshQuest(b.dataset.q); });
+  m.querySelectorAll('[data-toggle]').forEach(b => b.onclick = () => { const id = b.dataset.toggle; open.has(id) ? open.delete(id) : open.add(id); refreshQuest(id, true); });
+  m.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => jumpTo(b.dataset.jump));
+}
+
+// Re-render one quest card in place (keeps scroll position), then refresh counters.
+function refreshQuest(id, onlyCard) {
+  const el = $('q-' + id);
+  if (el) { el.outerHTML = questHTML(id); bindMain(); }
+  if (!onlyCard) { renderOverall(); renderCats(); updateHead(); }
+}
+function updateHead() {
+  const scope = prefs.cat === 'all' ? allIds : (byCat.get(prefs.cat) || []);
+  const s = stats(scope);
+  const meta = $('main').querySelector('.meta'); if (meta) meta.textContent = `${s.done} of ${s.total} completed (${s.pct.toFixed(1)}%) · ${s.prog} in progress`;
+  const bar = $('main').querySelector('.head + .meter i'); if (bar) bar.style.width = s.pct + '%';
+}
+
+function jumpTo(id) {
+  const q = data.quests[id];
+  prefs.cat = q.cat; prefs.q = q.name; prefs.status = 'all'; prefs.min = ''; prefs.max = '';
+  if (q.event) prefs.hideEvents = false;
+  if (q.repeat) prefs.hideRepeat = false;
+  savePrefs(); open.add(id); shown = PAGE; render();
+  $('q-' + id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function render() {
+  if (!data) { $('cats').innerHTML = '<div class="empty">Loading…</div>'; renderMain(); return; }
+  renderOverall(); renderCats(); renderMain();
+}
+
+/* =========================================================
+   Reset / backup
+   ========================================================= */
+$('resetBtn').onclick = () => {
+  const n = Object.keys(progress).length;
+  if (!n) { setStatus('Nothing to reset — no progress saved yet.'); return; }
+  if (!confirm(`Reset ALL quest progress (${n} quest${n > 1 ? 's' : ''} tracked)?\n\nTip: click “Export progress” first if you want a backup. This can't be undone.`)) return;
+  progress = {}; saveProgress(); render();
+  setStatus('All progress has been reset.', 'ok');
+};
+$('exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify({ app: 'dofus-quest-tracker', savedAt: new Date().toISOString(), progress }, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = `dofus-quest-progress-${new Date().toISOString().slice(0, 10)}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+};
+$('importFile').onchange = async e => {
+  const file = e.target.files?.[0]; if (!file) return;
+  try {
+    const obj = JSON.parse(await file.text());
+    const p = obj?.progress ?? obj;
+    if (!p || typeof p !== 'object' || Array.isArray(p)) throw new Error('unrecognized file format');
+    const next = {};
+    for (const [id, v] of Object.entries(p)) {
+      if (!/^\d+$/.test(id) || !v || typeof v !== 'object') continue;
+      if (v.done === true) next[id] = { done: true };
+      else if (Array.isArray(v.steps) && v.steps.length) next[id] = { steps: v.steps.map(String) };
+    }
+    if (!Object.keys(next).length) throw new Error('no quest progress found in that file');
+    if (Object.keys(progress).length && !confirm('Replace your current progress with the one from this file?')) return;
+    progress = next; saveProgress(); render();
+    setStatus(`Imported progress for ${Object.keys(next).length} quests.`, 'ok');
+  } catch (err) { setStatus('Import failed: ' + err.message, 'err'); }
+  finally { e.target.value = ''; }
+};
+
+/* =========================================================
+   Startup
+   ========================================================= */
+$('catSearch').oninput = renderCats;
+$('sync').onclick = sync;
+(function start() {
+  data = loadJSON(CACHE_KEY, null);
+  if (data && data.quests && data.cats) {
+    index(); render();
+    setStatus('Loaded saved quests from ' + new Date(data.at).toLocaleDateString('en-US') + '.', 'ok');
+    if (Date.now() - (data.at || 0) > STALE_MS) sync();
+  } else { data = null; render(); sync(); }
+})();
+</script>
+</body>
+</html>
