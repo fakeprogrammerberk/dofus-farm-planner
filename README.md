@@ -7,7 +7,6 @@
 | 🌾 Farm Planner | **https://fakeprogrammerberk.github.io/dofus-farm-planner/** |
 | 📜 Quest Tracker | **https://fakeprogrammerberk.github.io/dofus-farm-planner/quests.html** |
 | 🏆 Collection (archmonsters & dungeon bosses) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/collection.html** |
-| ⚔️ Build Planner | **https://fakeprogrammerberk.github.io/dofus-farm-planner/builds.html** |
 
 No install or account needed — just open a link. Your progress is saved in your own browser.
 
@@ -26,13 +25,6 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Tick whole quests or individual steps; progress is saved automatically in your browser
 - Overall and per-category progress bars, filters (available now, in progress, completed, level range)
 - Reset all progress or one category; export/import a progress backup
-
-## Build Planner (`builds.html`)
-
-- Equip hat, cloak, amulet, 2 rings, belt, boots, weapon, shield, pet/mount and 6 Dofus/trophies — search any item by name and level
-- Live stat totals: AP, MP, range, HP, initiative, prospecting, characteristics, damage and resistances, including set bonuses
-- Characteristic points with the game's tiered costs, plus scrolls; max/min item rolls
-- Save multiple builds, duplicate, share a build with a link, export/import
 
 ## Usage
 
