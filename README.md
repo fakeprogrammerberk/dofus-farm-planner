@@ -7,6 +7,7 @@
 | 🌾 Farm Planner | **https://fakeprogrammerberk.github.io/dofus-farm-planner/** |
 | 📜 Quest Tracker | **https://fakeprogrammerberk.github.io/dofus-farm-planner/quests.html** |
 | 🏆 Collection (archmonsters & dungeon bosses) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/collection.html** |
+| ⚒️ Profession XP Calculator | **https://fakeprogrammerberk.github.io/dofus-farm-planner/jobs.html** |
 | 🕰️ Count Harebourg Simulator | **https://fakeprogrammerberk.github.io/dofus-farm-planner/harebourg.html** |
 
 No install or account needed — just open a link. Your progress is saved in your own browser.
@@ -26,6 +27,14 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Tick whole quests or individual steps; progress is saved automatically in your browser
 - Overall and per-category progress bars, filters (available now, in progress, completed, level range)
 - Reset all progress or one category; export/import a progress backup
+
+## Profession XP Calculator (`jobs.html`)
+
+- Pick a profession, your current level (or exact XP) and a target level
+- Every recipe with the XP it gives at your level, and how many crafts you need for the next level
+- Add crafts with +1, “craft until the next 10 levels” or “craft until target” — XP is recalculated level by level
+- XP coefficient (Almanax/events) and Epic server bonus
+- Shopping list with every ingredient your plan needs, copyable
 
 ## Count Harebourg Simulator (`harebourg.html`)
 
