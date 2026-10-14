@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Harebourg Simulator</title>
+<style>
+  :root {
+    --bg: #0c1a20; --panel: #12252d; --line: #22414c; --text: #e6eef0; --muted: #8fa7ae;
+    --gold: #e0a84a; --tile-a: #183039; --tile-b: #1c3842; --tile-stroke: #2a4a55;
+    --you: #2fae5f; --mon: #e0574c; --tap: #3b8fe0; --block-top: #7a4a33; --block-side: #5a3424; --pit: #081014;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: radial-gradient(ellipse at top, #13303a, var(--bg) 60%); color: var(--text);
+    font: 15px/1.5 system-ui, "Segoe UI", sans-serif; min-height: 100vh; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 24px 16px 48px; }
+  .eyebrow { color: var(--gold); font-size: 12px; letter-spacing: .15em; text-transform: uppercase; font-weight: 600; }
+  h1 { font-family: Georgia, serif; font-weight: 400; font-size: clamp(28px, 5vw, 48px); margin: 6px 0 8px; }
+  .lead { color: var(--muted); max-width: 640px; margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: 280px 1fr; gap: 20px; }
+  @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .step { color: var(--gold); font-size: 11px; letter-spacing: .15em; font-weight: 700; }
+  h2 { font-family: Georgia, serif; font-weight: 400; font-size: 20px; margin: 4px 0 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
+  .hp { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 8px; padding: 10px 12px;
+    background: #0f1f26; border: 1px solid var(--line); border-radius: 10px; color: var(--text); cursor: pointer; font: inherit; text-align: left; }
+  .hp:hover { border-color: #3a6573; }
+  .hp.on { border-color: var(--gold); background: #1b2a2c; box-shadow: 0 0 0 1px var(--gold) inset; }
+  .heart { width: 46px; height: 42px; flex: none; position: relative; }
+  .heart svg { width: 100%; height: 100%; }
+  .heart span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 9px; font-weight: 800; color: #fff; line-height: 1.05; text-align: center; padding-bottom: 4px; }
+  .rot { font-family: Georgia, serif; font-size: 17px; }
+  .boardhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  .live { font-size: 12px; color: #7fe0a0; border: 1px solid #2c6a45; background: #133024; padding: 4px 10px; border-radius: 99px; }
+  .board { background: #0a161b; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; position: relative; }
+  svg.map { display: block; width: 100%; height: auto; user-select: none; }
+  .cell { stroke: var(--tile-stroke); stroke-width: 1; cursor: pointer; }
+  .cell.a { fill: var(--tile-a); } .cell.b { fill: var(--tile-b); }
+  .cell:hover { fill: #29505c; }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin-top: 12px; }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; margin-right: 6px; }
+  .alert { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 14px; display: none; }
+  .alert.warn { display: block; background: #3a1d1a; border: 1px solid #7a3a32; color: #ffb4a8; }
+  .alert.ok { display: block; background: #13302a; border: 1px solid #2c6a55; color: #a8f0d0; }
+  .info { margin-top: 20px; }
+  .info p { color: var(--muted); }
+  .btn { background: transparent; border: 1px solid var(--line); color: var(--muted); border-radius: 8px; padding: 5px 10px; cursor: pointer; font: inherit; font-size: 12px; }
+  .btn:hover { color: var(--text); border-color: #3a6573; }
+  .topnav { position: sticky; top: 0; z-index: 10; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 20px; background: #0f1115f2; border-bottom: 1px solid #22414c; backdrop-filter: blur(8px); }
+  .topnav .logo { font-weight: 700; font-size: 18px; } .topnav .logo span { color: #5cc8a8; }
+  .topnav nav { display: flex; gap: 4px; flex-wrap: wrap; }
+  .topnav nav a { padding: 6px 10px; border-radius: 8px; color: var(--muted); text-decoration: none; font-size: 13px; font-weight: 600; }
+  .topnav nav a:hover { color: var(--text); } .topnav nav a.on { color: #5cc8a8; background: #5cc8a822; }
+</style>
+</head>
+<body>
+<div class="topnav">
+  <div class="logo">Dofus <span>Harebourg</span></div>
+  <nav><a href="index.html">Farm Planner</a><a href="quests.html">Quests</a><a href="collection.html">Collection</a><a href="harebourg.html" class="on">Harebourg</a></nav>
+</div>
+<div class="wrap">
+  <div class="eyebrow">Combat assistant · Frigost III</div>
+  <h1>Count Harebourg Simulator</h1>
+  <p class="lead">Clepsydra Tower, Frigost 3. Pick your vitality range at the start of your turn. Left click to place yourself, right click to place the monster, and find the blue cell to hit.</p>
+
+  <div class="grid">
+    <div class="card">
+      <div class="step">STEP 01</div>
+      <h2>Character vitality</h2>
+      <p class="hint">Select your character's HP range at the start of the turn.</p>
+      <div id="hpList"></div>
+    </div>
+
+    <div class="card">
+      <div class="boardhead">
+        <div>
+          <div class="step">STEP 02</div>
+          <h2>Place the fighters</h2>
+          <p class="hint">Left click: You · Right click: Monster</p>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="reset">Reset</button>
+          <span class="live">● Live calculation</span>
+        </div>
+      </div>
+      <div class="board"><svg class="map" id="map"></svg></div>
+      <div class="legend">
+        <span><i style="background:var(--mon)"></i>Monster</span>
+        <span><i style="background:var(--you)"></i>You</span>
+        <span><i style="background:var(--tap)"></i>Hit here</span>
+        <span><i style="background:var(--block-top)"></i>Wall</span>
+        <span><i style="background:var(--pit);border:1px solid #2a4a55"></i>Hole</span>
+      </div>
+      <div class="alert" id="alert"></div>
+    </div>
+  </div>
+
+  <div class="card info">
+    <h2>How does Count Harebourg work?</h2>
+    <p>Count Harebourg is the boss of the Clepsydra Tower in Frigost 3, in Dofus. Every turn, your spells are redirected by a rotation (90° clockwise, 90° counter-clockwise or 180°) around your character, depending on your vitality at the start of your turn.</p>
+    <p>This simulator tells you which cell to hit: pick your vitality range, place your character and the monster on the map, and the target cell shows up in blue. You get a warning when there is no line of sight or the target cell is off the map.</p>
+  </div>
+</div>
+
+<script>
+// ---- Map data: key "a,b" (a = row, b = column; a+b even) ----
+const ROWS = {
+  "-2":[-2,2],"-1":[-5,5],"0":[-8,8],"1":[-9,9],"2":[-10,10],"3":[-11,11],"4":[-10,10],"5":[-11,11],
+  "6":[-12,12],"7":[-11,11],"8":[-12,12],"9":[-13,13],"10":[-12,12],"11":[-13,13],"12":[-12,12],
+  "13":[-13,13],"14":[-12,12],"15":[-11,11],"16":[-12,12],"17":[-11,11],"18":[-10,10],"19":[-11,11],
+  "20":[-10,10],"21":[-9,9],"22":[-8,8],"23":[-5,5],"24":[-2,2]
+};
+const CELLS = new Set();
+for (const a in ROWS) { const [lo, hi] = ROWS[a]; for (let b = lo; b <= hi; b += 2) CELLS.add(a + "," + b); }
+const BLOCKS = new Set(['0,-8','1,-9','1,-7','2,-8','12,-8','13,-9','13,-7','14,-8','10,0','11,-1','11,1','12,0','7,7','8,6','8,8','9,7','22,-2','16,12']);
+const PITS = new Set(['2,-6','14,-6','15,-7','6,8','9,5','10,6','21,-1']);
+// Wall blocks: center + size (2x2 or 1x1)
+const BLOCK_GROUPS = [{c:[1,-8],n:2},{c:[13,-8],n:2},{c:[11,0],n:2},{c:[8,7],n:2},{c:[22,-2],n:1},{c:[16,12],n:1}];
+
+const HP = [
+  { range: ["100%","90%"], label: "90° Clockwise",      rot: "cw"  },
+  { range: ["89%","75%"],  label: "90° Counter-clockwise", rot: "ccw" },
+  { range: ["74%","45%"],  label: "180°", rot: "180" },
+  { range: ["44%","30%"],  label: "90° Counter-clockwise", rot: "ccw" },
+  { range: ["29%","0%"],   label: "90° Clockwise",      rot: "cw"  },
+];
+
+// ---- State ----
+const state = { hp: 0, you: [17,1], mon: [13,1] };
+try { const s = JSON.parse(localStorage.getItem("harebourg") || "null"); if (s) Object.assign(state, s); } catch (e) {}
+const save = () => { try { localStorage.setItem("harebourg", JSON.stringify(state)); } catch (e) {} };
+
+// ---- Geometry ----
+const W = 32, H = 16, OX = 464, OY = 82;   // half width / half height
+const cx = b => OX + W * b, cy = a => OY + H * a;
+const diamond = (a, b, s = 1) => {
+  const x = cx(b), y = cy(a);
+  return `${x},${y - H*s} ${x + W*s},${y} ${x},${y + H*s} ${x - W*s},${y}`;
+};
+const key = (a, b) => a + "," + b;
+const ok = (a, b) => CELLS.has(key(a, b));
+
+// Rotation: the spell is rotated around the player. Apply the inverse rotation to find the target.
+function tapCell(rot, P, M) {
+  const da = M[0] - P[0], db = M[1] - P[1];
+  let t;
+  if (rot === "cw")  t = [-db, da];   // lands on the monster once rotated clockwise
+  if (rot === "ccw") t = [db, -da];
+  if (rot === "180") t = [-da, -db];
+  return [P[0] + t[0], P[1] + t[1]];
+}
+
+// Line of sight: is there a wall along the line in (u,v) grid coordinates?
+function hasLOS(P, T) {
+  const toUV = ([a, b]) => [(a + b) / 2, (a - b) / 2];
+  const [u0, v0] = toUV(P), [u1, v1] = toUV(T);
+  const du = u1 - u0, dv = v1 - v0, n = Math.max(Math.abs(du), Math.abs(dv)) * 4;
+  for (let i = 1; i < n; i++) {
+    const t = i / n, u = u0 + du * t, v = v0 + dv * t;
+    // For points on a cell edge, check both neighbouring cells
+    const us = Math.abs(u - Math.round(u)) === 0.5 ? [Math.floor(u), Math.ceil(u)] : [Math.round(u)];
+    const vs = Math.abs(v - Math.round(v)) === 0.5 ? [Math.floor(v), Math.ceil(v)] : [Math.round(v)];
+    let blocked = 0, total = 0;
+    for (const uu of us) for (const vv of vs) {
+      const a = uu + vv, b = uu - vv;
+      if ((a === P[0] && b === P[1]) || (a === T[0] && b === T[1])) continue;
+      total++; if (BLOCKS.has(key(a, b))) blocked++;
+    }
+    if (total && blocked === total) return false;
+  }
+  return true;
+}
+
+// ---- Vitality list ----
+const hpList = document.getElementById("hpList");
+HP.forEach((h, i) => {
+  const btn = document.createElement("button");
+  btn.className = "hp";
+  btn.innerHTML = `<div class="heart"><svg viewBox="0 0 32 30"><path d="M16 28 C 4 19 1 13 1 8.5 A 7 7 0 0 1 16 6 A 7 7 0 0 1 31 8.5 C 31 13 28 19 16 28Z" fill="#d8394a" stroke="#ff8a95" stroke-width="1"/></svg><span>${h.range[0]}<br>-<br>${h.range[1]}</span></div><span class="rot">${h.label}</span>`;
+  btn.onclick = () => { state.hp = i; render(); };
+  hpList.appendChild(btn);
+});
+
+// ---- Map rendering ----
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("map");
+svg.setAttribute("viewBox", "0 0 928 520");
+const el = (tag, attrs, parent = svg) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; };
+
+const gCells = el("g", {}), gPits = el("g", {}), gMarks = el("g", {}), gBlocks = el("g", {}), gTags = el("g", {});
+
+[...CELLS].sort((p, q) => { const [a1,b1]=p.split(",").map(Number),[a2,b2]=q.split(",").map(Number); return a1-a2||b1-b2; })
+  .forEach(k => {
+    const [a, b] = k.split(",").map(Number);
+    if (BLOCKS.has(k)) return;
+    if (PITS.has(k)) {
+      el("polygon", { points: diamond(a, b), fill: "var(--pit)", stroke: "#203a44" }, gPits);
+      el("polygon", { points: diamond(a + 0.15, b, 0.75), fill: "#050b0e" }, gPits);
+      return;
+    }
+    const p = el("polygon", { points: diamond(a, b), class: "cell " + (((a + b) / 2) % 2 ? "a" : "b") }, gCells);
+    p.dataset.k = k;
+  });
+
+// Walls (simple isometric boxes)
+BLOCK_GROUPS.sort((p, q) => p.c[0] - q.c[0]).forEach(({ c: [a, b], n }) => {
+  const s = n, h = 14;
+  const x = cx(b), y = cy(a);
+  const top = [[x, y - H*s - h], [x + W*s, y - h], [x, y + H*s - h], [x - W*s, y - h]];
+  const pts = arr => arr.map(p => p.join(",")).join(" ");
+  el("polygon", { points: pts([[x - W*s, y - h], [x, y + H*s - h], [x, y + H*s], [x - W*s, y]]), fill: "var(--block-side)" }, gBlocks);
+  el("polygon", { points: pts([[x + W*s, y - h], [x, y + H*s - h], [x, y + H*s], [x + W*s, y]]), fill: "#4a2a1d" }, gBlocks);
+  el("polygon", { points: pts(top), fill: "var(--block-top)", stroke: "#94603f" }, gBlocks);
+});
+
+// Clicks
+svg.addEventListener("contextmenu", e => e.preventDefault());
+svg.addEventListener("mousedown", e => {
+  const k = e.target.dataset && e.target.dataset.k;
+  if (!k) return;
+  const pos = k.split(",").map(Number);
+  if (e.button === 0) state.you = pos;
+  else if (e.button === 2) state.mon = pos;
+  render();
+});
+
+function tag(a, b, text, color) {
+  const x = cx(b), y = cy(a) - 34;
+  const w = text.length * 7 + 14;
+  const g = el("g", {}, gTags);
+  el("rect", { x: x - w/2, y: y - 10, width: w, height: 18, rx: 4, fill: "#0b1418", stroke: color }, g);
+  const t = el("text", { x, y: y + 3, "text-anchor": "middle", fill: "#fff", "font-size": 11, "font-weight": 600 }, g);
+  t.textContent = text;
+  el("line", { x1: x, y1: y + 8, x2: x, y2: cy(a) - 6, stroke: color, "stroke-dasharray": "2 3" }, g);
+}
+
+function render() {
+  save();
+  [...hpList.children].forEach((b, i) => b.classList.toggle("on", i === state.hp));
+  gMarks.innerHTML = ""; gTags.innerHTML = "";
+  const P = state.you, M = state.mon;
+  const T = tapCell(HP[state.hp].rot, P, M);
+  const alert = document.getElementById("alert");
+  const same = P[0] === M[0] && P[1] === M[1];
+
+  el("polygon", { points: diamond(M[0], M[1], 0.85), fill: "var(--mon)", opacity: .9 }, gMarks);
+  el("polygon", { points: diamond(P[0], P[1], 0.85), fill: "var(--you)", opacity: .9 }, gMarks);
+
+  if (same) {
+    alert.className = "alert warn"; alert.textContent = "You and the monster can't be on the same cell.";
+  } else {
+    const inMap = ok(T[0], T[1]);
+    el("line", { x1: cx(P[1]), y1: cy(P[0]), x2: cx(M[1]), y2: cy(M[0]), stroke: "var(--mon)", "stroke-dasharray": "4 4", opacity: .7 }, gMarks);
+    el("line", { x1: cx(P[1]), y1: cy(P[0]), x2: cx(T[1]), y2: cy(T[0]), stroke: "var(--tap)", "stroke-dasharray": "4 4", opacity: .9 }, gMarks);
+    el("polygon", { points: diamond(T[0], T[1], 0.85), fill: "var(--tap)", opacity: inMap ? .95 : .4 }, gMarks);
+    tag(T[0], T[1], "Hit here", "var(--tap)");
+
+    const msgs = [];
+    if (!inMap) msgs.push("Target cell is off the map — you can't hit from this position.");
+    else if (BLOCKS.has(key(T[0], T[1]))) msgs.push("Target cell is on a wall.");
+    else if (!hasLOS(P, T)) msgs.push("No line of sight to the target cell (blocked by a wall).");
+    if (msgs.length) { alert.className = "alert warn"; alert.textContent = "⚠ " + msgs.join(" "); }
+    else { alert.className = "alert ok"; alert.textContent = `✓ ${HP[state.hp].label}: hit the blue cell — the spell rotates onto the monster.`; }
+  }
+  tag(M[0], M[1], "Monster", "var(--mon)");
+  tag(P[0], P[1], "You", "var(--you)");
+}
+
+document.getElementById("reset").onclick = () => { state.hp = 0; state.you = [17,1]; state.mon = [13,1]; render(); };
+render();
+</script>
+</body>
+</html>

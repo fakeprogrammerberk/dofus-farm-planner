@@ -7,6 +7,7 @@
 | 🌾 Farm Planner | **https://fakeprogrammerberk.github.io/dofus-farm-planner/** |
 | 📜 Quest Tracker | **https://fakeprogrammerberk.github.io/dofus-farm-planner/quests.html** |
 | 🏆 Collection (archmonsters & dungeon bosses) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/collection.html** |
+| 🕰️ Count Harebourg Simulator | **https://fakeprogrammerberk.github.io/dofus-farm-planner/harebourg.html** |
 
 No install or account needed — just open a link. Your progress is saved in your own browser.
 
@@ -25,6 +26,13 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Tick whole quests or individual steps; progress is saved automatically in your browser
 - Overall and per-category progress bars, filters (available now, in progress, completed, level range)
 - Reset all progress or one category; export/import a progress backup
+
+## Count Harebourg Simulator (`harebourg.html`)
+
+- Clepsydra Tower (Frigost 3) map with walls and holes
+- Pick your vitality range at the start of the turn (90° clockwise, 90° counter-clockwise or 180°)
+- Left click to place yourself, right click to place the monster — the cell to hit is shown in blue
+- Warns when the target cell is off the map or there is no line of sight
 
 ## Usage
 
