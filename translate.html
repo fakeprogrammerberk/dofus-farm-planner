@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dofus Translator</title>
+<style>
+:root{
+  --bg:#0f1115;--surface:#171a21;--surface2:#1e222b;--line:#2c313c;
+  --text:#e9ebf0;--dim:#9aa1b0;--accent:#5cc8a8;--accent-soft:#5cc8a822;
+  --good:#5fd38d;--warn:#e8b54a;--bad:#ef6f6f;
+  --radius:10px;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent)}
+
+/* ---------- top bar ---------- */
+.bar{position:sticky;top:0;z-index:10;display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 20px;background:#0f1115f2;border-bottom:1px solid var(--line);backdrop-filter:blur(8px)}
+.logo{font-weight:700;font-size:18px}
+.logo span{color:var(--accent)}
+.nav{display:flex;flex-wrap:wrap;gap:4px;margin-right:auto}
+.nav a{padding:6px 10px;border-radius:8px;color:var(--dim);text-decoration:none;font-size:13px;font-weight:600}
+.nav a:hover{color:var(--text)}
+.nav a.on{color:var(--accent);background:var(--accent-soft)}
+.status{font-size:12px;color:var(--dim);max-width:420px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.status.err{color:var(--bad)}
+.status.ok{color:var(--good)}
+.btn{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#08140f}
+.btn.danger{color:var(--bad);border-color:#ef6f6f55}
+.btn.danger:hover{border-color:var(--bad);background:#ef6f6f14}
+
+.wrap{max-width:1300px;margin:0 auto;padding:18px 20px 60px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+h2{font-size:15px;margin:0 0 10px}
+
+/* ---------- translator ---------- */
+.langs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line)}
+.langs select{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px;width:100%;font-weight:600}
+.langs select:focus{outline:none;border-color:var(--accent)}
+.swap{width:40px;height:40px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);font-size:17px}
+.swap:hover{border-color:var(--accent);color:var(--accent)}
+.panes{display:grid;grid-template-columns:1fr 1fr}
+@media(max-width:800px){.panes{grid-template-columns:1fr}.pane+.pane{border-left:0!important;border-top:1px solid var(--line)}}
+.pane{display:flex;flex-direction:column;min-height:300px}
+.pane+.pane{border-left:1px solid var(--line)}
+textarea,.out{flex:1;width:100%;min-height:260px;background:none;border:0;resize:vertical;padding:16px;font-size:16px;line-height:1.55;white-space:pre-wrap;overflow-wrap:anywhere}
+textarea:focus{outline:none}
+.out{background:#ffffff03}
+.out.placeholder{color:var(--dim)}
+.foot{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);color:var(--dim);font-size:12px}
+.foot .grow{margin-right:auto}
+.route{display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap}
+.route b{color:var(--text);font-weight:600}
+.meter{height:6px;background:var(--bg);border:1px solid var(--line);border-radius:999px;overflow:hidden;margin-top:6px}
+.meter i{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .2s}
+.progress{padding:0 16px 12px;display:none}
+.progress.on{display:block}
+.progress small{color:var(--dim);font-size:12px}
+
+/* ---------- models ---------- */
+.models{margin-top:14px;padding:16px}
+.mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.model{display:flex;align-items:center;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:9px 10px}
+.model .info{flex:1;min-width:0}
+.model .nm{font-weight:600}
+.model .sub{color:var(--dim);font-size:12px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--line);flex:none}
+.dot.ok{background:var(--good)}
+.dot.busy{background:var(--warn)}
+.hint{color:var(--dim);font-size:13px;margin:0 0 12px}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--accent);color:#08140f;font-weight:700;padding:8px 14px;border-radius:8px;z-index:60;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.on{opacity:1}
+footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
+</style>
+</head>
+<body>
+
+<div class="bar">
+  <div class="logo">Dofus <span>Translator</span></div>
+  <nav class="nav"><a href="index.html">Farm Planner</a><a href="quests.html">Quests</a><a href="collection.html">Collection</a><a href="jobs.html">Profession XP</a><a href="harebourg.html">Harebourg</a><a href="translate.html" class="on">Translator</a></nav>
+  <span class="status" id="status">Starting…</span>
+</div>
+
+<div class="wrap">
+  <div class="card">
+    <div class="langs">
+      <select id="from" aria-label="Translate from"></select>
+      <button class="swap" id="swap" title="Swap languages">⇄</button>
+      <select id="to" aria-label="Translate to"></select>
+    </div>
+    <div class="panes">
+      <div class="pane">
+        <textarea id="src" placeholder="Type or paste text… (Ctrl+Enter to translate)" spellcheck="false"></textarea>
+        <div class="foot"><span class="grow" id="count">0 characters</span><button class="btn sm" id="clear">Clear</button><button class="btn primary" id="go">Translate</button></div>
+      </div>
+      <div class="pane">
+        <div class="out placeholder" id="out">Translation</div>
+        <div class="progress" id="progress"><small id="progText"></small><div class="meter"><i id="progBar" style="width:0"></i></div></div>
+        <div class="foot"><span class="grow route" id="route"></span><button class="btn sm" id="copy">Copy</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card models">
+    <h2>Offline language packs</h2>
+    <p class="hint">Translation runs entirely in your browser. Each language pack is downloaded once the first time you need it and then works without internet. Pairs without a direct pack go through English automatically.</p>
+    <div class="mgrid" id="models"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<footer>Machine translation by <a href="https://huggingface.co/Helsinki-NLP" target="_blank" rel="noopener">OPUS-MT</a> models, run locally with <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener">Transformers.js</a>. Your text never leaves your device.</footer>
+
+<script>
+'use strict';
+/* =========================================================
+   Config & helpers
+   ========================================================= */
+const LANGS = { en: 'English', tr: 'Türkçe', es: 'Español', fr: 'Français' };
+// Language packs. English → Turkish uses a multilingual model (no good dedicated
+// one runs in the browser). Pairs without a pack are routed through English.
+const PACKS = {
+  'any-tr': { model: 'Xenova/m2m100_418M', size: 640, batch: 1, label: 'English → Türkçe' },
+  'tr-en': { model: 'Xenova/opus-mt-tr-en', size: 110 },
+  'en-es': { model: 'Xenova/opus-mt-en-es', size: 110 },
+  'es-en': { model: 'Xenova/opus-mt-es-en', size: 110 },
+  'en-fr': { model: 'Xenova/opus-mt-en-fr', size: 110 },
+  'fr-en': { model: 'Xenova/opus-mt-fr-en', size: 110 },
+  'es-fr': { model: 'Xenova/opus-mt-es-fr', size: 110 },
+  'fr-es': { model: 'Xenova/opus-mt-fr-es', size: 110 },
+};
+const PREFS_KEY = 'dtr-prefs';
+const MODEL_CACHE = 'transformers-cache';
+const BATCH = 6;   // sentences per call; the multilingual model works one at a time
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function loadJSON(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback } catch { return fallback } }
+function saveJSON(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); return true } catch { return false } }
+function setStatus(msg, kind = '') { const el = $('status'); el.textContent = msg; el.title = msg; el.className = 'status ' + kind; }
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('on'), 1600); }
+const mb = n => n >= 1000 ? (n / 1000).toFixed(1) + ' GB' : Math.round(n) + ' MB';
+
+const prefs = Object.assign({ from: 'tr', to: 'en', text: '' }, loadJSON(PREFS_KEY, {}));
+const savePrefs = () => saveJSON(PREFS_KEY, prefs);
+
+// Steps needed to go from one language to another, e.g. tr→fr = tr→en, en→fr.
+function route(from, to) {
+  if (from === to) return [];
+  const step = (a, b) => PACKS[a + '-' + b] ? { key: a + '-' + b, from: a, to: b } : { key: 'any-' + b, from: a, to: b, opts: { src_lang: a, tgt_lang: b } };
+  if (from === 'en' || to === 'en' || PACKS[from + '-' + to]) return [step(from, to)];
+  return [step(from, 'en'), step('en', to)];
+}
+
+/* =========================================================
+   Worker
+   ========================================================= */
+const worker = new Worker('translate-worker.js', { type: 'module' });
+let nextId = 1;
+const waiting = new Map();
+let onProgress = null;
+worker.onmessage = ({ data }) => {
+  if (data.type === 'progress') { if (onProgress) onProgress(data); return; }
+  const w = waiting.get(data.id); if (!w) return;
+  waiting.delete(data.id);
+  data.type === 'error' ? w.reject(new Error(data.message)) : w.resolve(data);
+};
+worker.onerror = e => setStatus('Translator failed to start: ' + (e.message || 'unknown error'), 'err');
+function call(msg) { return new Promise((resolve, reject) => { const id = nextId++; waiting.set(id, { resolve, reject }); worker.postMessage({ ...msg, id }); }); }
+const pack = key => ({ model: PACKS[key].model, dtype: PACKS[key].dtype || 'q8' });
+
+/* =========================================================
+   Downloaded packs (Cache Storage)
+   ========================================================= */
+let cached = new Set();
+async function refreshCached() {
+  cached = new Set();
+  try {
+    const c = await caches.open(MODEL_CACHE);
+    const keys = (await c.keys()).map(r => r.url);
+    for (const [k, p] of Object.entries(PACKS)) if (keys.some(u => u.includes('/' + p.model + '/') && u.includes('.onnx'))) cached.add(k);
+  } catch {}
+  renderModels();
+}
+async function deletePack(key) {
+  const p = PACKS[key];
+  try {
+    const c = await caches.open(MODEL_CACHE);
+    for (const r of await c.keys()) if (r.url.includes('/' + p.model + '/')) await c.delete(r);
+  } catch {}
+  toast('Removed ' + label(key));
+  setTimeout(() => location.reload(), 600);   // drop the model from memory too
+}
+const label = key => { if (PACKS[key].label) return PACKS[key].label; const [a, b] = key.split('-'); return LANGS[a] + ' → ' + LANGS[b]; };
+const stepLabel = s => LANGS[s.from] + ' → ' + LANGS[s.to];
+
+let busyPack = null;
+function renderModels() {
+  $('models').innerHTML = Object.entries(PACKS).map(([k, p]) => {
+    const ok = cached.has(k), busy = busyPack === k;
+    return `<div class="model"><span class="dot ${ok ? 'ok' : busy ? 'busy' : ''}"></span>
+      <div class="info"><div class="nm">${esc(label(k))}</div><div class="sub">${ok ? 'Ready offline' : busy ? 'Downloading…' : '≈ ' + mb(p.size) + ' download'}</div></div>
+      ${ok ? `<button class="btn sm danger" data-del="${k}">Remove</button>` : `<button class="btn sm" data-get="${k}" ${busyPack ? 'disabled' : ''}>Download</button>`}</div>`;
+  }).join('');
+}
+
+async function ensure(key) {
+  if (cached.has(key)) return call({ type: 'load', ...pack(key) });
+  busyPack = key; renderModels();
+  showProgress(`Downloading ${label(key)} (once, ≈ ${mb(PACKS[key].size)})…`, 0);
+  onProgress = d => showProgress(`Downloading ${label(key)}… ${mb(d.loaded / 1e6)} / ${mb(d.total / 1e6)}`, d.loaded / d.total);
+  try { await call({ type: 'load', ...pack(key) }); }
+  finally { onProgress = null; busyPack = null; await refreshCached(); }
+}
+
+function showProgress(text, frac) {
+  $('progress').classList.add('on');
+  $('progText').textContent = text;
+  $('progBar').style.width = Math.round(Math.min(1, frac) * 100) + '%';
+}
+const hideProgress = () => $('progress').classList.remove('on');
+
+/* =========================================================
+   Translation
+   ========================================================= */
+// Split into lines, then sentences, so long texts translate well and keep their layout.
+function segment(text, lang) {
+  const seg = typeof Intl !== 'undefined' && Intl.Segmenter ? new Intl.Segmenter(lang, { granularity: 'sentence' }) : null;
+  return text.split('\n').map(line => {
+    if (!line.trim()) return [];
+    if (!seg) return [line.trim()];
+    return [...seg.segment(line)].map(s => s.segment.trim()).filter(Boolean);
+  });
+}
+
+let running = false;
+async function translate() {
+  const text = $('src').value;
+  const steps = route(prefs.from, prefs.to);
+  if (!text.trim()) { $('out').textContent = 'Translation'; $('out').classList.add('placeholder'); return; }
+  if (!steps.length) { setOutput(text); return; }
+  if (running) return;
+  running = true; $('go').disabled = true;
+  try {
+    for (const s of steps) await ensure(s.key);
+    let lines = segment(text, prefs.from);
+    const total = lines.flat().length * steps.length;
+    let done = 0;
+    for (const s of steps) {
+      const flat = lines.flat();
+      const out = [];
+      const size = PACKS[s.key].batch || BATCH;
+      for (let i = 0; i < flat.length; i += size) {
+        showProgress(`Translating ${stepLabel(s)}… ${Math.round(done / total * 100)}%`, done / total);
+        const r = await call({ type: 'translate', ...pack(s.key), opts: s.opts, texts: flat.slice(i, i + size) });
+        out.push(...r.texts);
+        done += Math.min(size, flat.length - i);
+      }
+      let k = 0;
+      lines = lines.map(l => l.map(() => out[k++]));
+    }
+    setOutput(lines.map(l => l.join(' ')).join('\n'));
+    setStatus('Translated offline in your browser', 'ok');
+  } catch (e) {
+    setStatus(navigator.onLine ? 'Translation failed: ' + e.message : 'This language pack is not downloaded yet — connect to the internet once to get it.', 'err');
+  } finally {
+    hideProgress(); running = false; $('go').disabled = false;
+  }
+}
+function setOutput(t) { $('out').textContent = t; $('out').classList.remove('placeholder'); }
+
+/* =========================================================
+   UI
+   ========================================================= */
+function renderLangs() {
+  const opts = sel => Object.entries(LANGS).map(([k, v]) => `<option value="${k}" ${k === sel ? 'selected' : ''}>${v}</option>`).join('');
+  $('from').innerHTML = opts(prefs.from);
+  $('to').innerHTML = opts(prefs.to);
+  const steps = route(prefs.from, prefs.to);
+  $('route').innerHTML = steps.length > 1
+    ? `Via English: <b>${LANGS[prefs.from]}</b> → <b>English</b> → <b>${LANGS[prefs.to]}</b>`
+    : steps.length ? `<b>${LANGS[prefs.from]}</b> → <b>${LANGS[prefs.to]}</b>` : 'Same language';
+}
+function updateCount() { $('count').textContent = $('src').value.length.toLocaleString('en-US') + ' characters'; }
+
+$('from').onchange = e => { prefs.from = e.target.value; if (prefs.from === prefs.to) prefs.to = prefs.from === 'en' ? 'tr' : 'en'; savePrefs(); renderLangs(); };
+$('to').onchange = e => { prefs.to = e.target.value; if (prefs.from === prefs.to) prefs.from = prefs.to === 'en' ? 'tr' : 'en'; savePrefs(); renderLangs(); };
+$('swap').onclick = () => {
+  [prefs.from, prefs.to] = [prefs.to, prefs.from];
+  if (!$('out').classList.contains('placeholder')) { $('src').value = $('out').textContent; setOutput(''); $('out').textContent = 'Translation'; $('out').classList.add('placeholder'); }
+  prefs.text = $('src').value; savePrefs(); renderLangs(); updateCount();
+};
+$('src').oninput = () => { prefs.text = $('src').value; savePrefs(); updateCount(); };
+$('src').onkeydown = e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); translate(); } };
+$('go').onclick = translate;
+$('clear').onclick = () => { $('src').value = ''; prefs.text = ''; savePrefs(); updateCount(); $('out').textContent = 'Translation'; $('out').classList.add('placeholder'); $('src').focus(); };
+$('copy').onclick = async () => {
+  if ($('out').classList.contains('placeholder')) return toast('Nothing to copy yet');
+  try { await navigator.clipboard.writeText($('out').textContent); toast('Copied'); } catch { toast('Could not copy'); }
+};
+$('models').addEventListener('click', async e => {
+  const b = e.target.closest('button'); if (!b || b.disabled) return;
+  if (b.dataset.del) return deletePack(b.dataset.del);
+  if (b.dataset.get) {
+    try { await ensure(b.dataset.get); toast(label(b.dataset.get) + ' ready offline'); }
+    catch (err) { setStatus('Download failed: ' + err.message, 'err'); }
+    finally { hideProgress(); }
+  }
+});
+
+/* =========================================================
+   Start
+   ========================================================= */
+$('src').value = prefs.text || '';
+renderLangs(); updateCount(); renderModels();
+refreshCached().then(() => setStatus(cached.size ? `${cached.size} language pack${cached.size > 1 ? 's' : ''} ready offline` : 'Pick languages and press Translate', cached.size ? 'ok' : ''));
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@
 | 🏆 Collection (archmonsters & dungeon bosses) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/collection.html** |
 | ⚒️ Profession XP Calculator | **https://fakeprogrammerberk.github.io/dofus-farm-planner/jobs.html** |
 | 🕰️ Count Harebourg Simulator | **https://fakeprogrammerberk.github.io/dofus-farm-planner/harebourg.html** |
+| 🌐 Translator (English, Türkçe, Español, Français) | **https://fakeprogrammerberk.github.io/dofus-farm-planner/translate.html** |
 
 No install or account needed — just open a link. Your progress is saved in your own browser.
 
@@ -42,6 +43,13 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Pick your vitality range at the start of the turn (90° clockwise, 90° counter-clockwise or 180°)
 - Left click to place yourself, right click to place the monster — the cell to hit is shown in blue
 - Warns when the target cell is off the map or there is no line of sight
+
+## Translator (`translate.html`)
+
+- Translate between English, Turkish, Spanish and French
+- Runs entirely in your browser with OPUS-MT and M2M100 models (Transformers.js) — your text never leaves your device
+- Each language pack downloads once (about 110 MB, or 640 MB for English → Turkish) and then works offline
+- Pairs without a direct pack go through English automatically; long texts are translated sentence by sentence and keep their line breaks
 
 ## Usage
 
