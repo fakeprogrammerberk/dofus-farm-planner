@@ -102,6 +102,23 @@ textarea:focus{outline:none}
 .fc-ans{font-size:22px;font-weight:700;margin:12px 0 2px}
 .fc-ans.ok{color:var(--good)} .fc-ans.bad{color:var(--bad)}
 .fc-you{color:var(--dim);font-size:13px}
+.opts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:600px;margin:16px auto 0}
+@media(max-width:600px){.opts{grid-template-columns:1fr}}
+.opt{display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:16px;font-weight:600;text-align:left;overflow-wrap:anywhere}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt:disabled{cursor:default}
+.opt .k{flex:none;color:var(--dim);font-size:11px;border:1px solid var(--line);border-radius:5px;padding:0 6px;font-weight:600}
+.opt.right{border-color:var(--good);background:#5fd38d1a;color:var(--good)}
+.opt.wrong{border-color:var(--bad);background:#ef6f6f1a;color:var(--bad)}
+.opt.dim{opacity:.45}
+.fc-sent{font-size:20px;line-height:1.55;max-width:760px;margin:10px auto 4px;overflow-wrap:anywhere}
+.blank{display:inline-block;min-width:80px;border-bottom:2px solid var(--accent);color:var(--accent);font-weight:700}
+.fc-hint{color:var(--dim);font-size:13px;margin-top:4px}
+.fc-fb{margin-top:14px;font-weight:600}
+.fc-fb.ok{color:var(--good)} .fc-fb.bad{color:var(--bad)}
+.known{display:inline-block;font-size:11px;padding:1px 8px;border-radius:999px;background:#5fd38d1a;color:var(--good);font-weight:600}
+.knownbtn{background:none;border:1px solid var(--line);border-radius:999px;padding:1px 9px;font-size:11px;color:var(--dim)}
+.knownbtn.on{border-color:#5fd38d66;color:var(--good);background:#5fd38d14}
 .btn.good{color:var(--good);border-color:#5fd38d55} .btn.good:hover{border-color:var(--good);background:#5fd38d14}
 .btn.bad{color:var(--bad);border-color:#ef6f6f55} .btn.bad:hover{border-color:var(--bad);background:#ef6f6f14}
 .wordstatus{color:var(--dim);font-size:12px;margin-left:8px}
@@ -157,7 +174,7 @@ footer{color:var(--dim);font-size:12px;text-align:center;padding:0 20px 30px}
     <div class="filebar" id="filebar"></div>
     <div class="fctools">
       <select id="pairSel" aria-label="Language pair"></select>
-      <div class="seg" id="dirSeg"><button data-dir="fw">Word → meaning</button><button data-dir="bw">Meaning → word</button></div>
+      <div class="seg" id="modeSeg"><button data-mode="mix">Mixed</button><button data-mode="fw">Word → meaning</button><button data-mode="bw">Meaning → word</button><button data-mode="cloze">Sentences</button></div>
       <span class="score" id="score"></span>
     </div>
     <div id="card"></div>
@@ -441,7 +458,7 @@ async function linkFile(h, merge) {
   await idbSet('wordsFile', h);
   saveJSON(WORDS_KEY, deck);
   if (merge) scheduleWrite();
-  cardId = null; renderLearn();
+  card = null; renderLearn();
 }
 async function newFile() {
   try {
@@ -511,7 +528,7 @@ async function saveWords(text, from, to) {
   for (let i = 0; i < fresh.length; i++) {
     const tr = await WordTools.baseForm(trs[i] || '', to);
     if (!tr || lowerL(tr, to) === fresh[i].lemma) continue;   // untranslated (names, numbers…)
-    deck.words.push({ id: wid(from, to, fresh[i].lemma), from, to, word: fresh[i].lemma, tr, ex: fresh[i].sentence, added: new Date().toISOString(), right: 0, wrong: 0 });
+    deck.words.push({ id: wid(from, to, fresh[i].lemma), from, to, word: fresh[i].lemma, form: fresh[i].word, tr, ex: fresh[i].sentence, added: new Date().toISOString(), right: 0, wrong: 0 });
     added++;
   }
   persistDeck();
@@ -520,66 +537,141 @@ async function saveWords(text, from, to) {
 }
 
 /* ---------- flashcard game ---------- */
-let cardId = null, revealed = null, recent = [], session = { right: 0, wrong: 0, streak: 0 };
+// card = { id, type: 'fw' | 'bw' | 'cloze', options: [text], answer: index, chosen: index | null }
+let card = null, recent = [], session = { right: 0, wrong: 0, streak: 0 }, autoNext = null;
 const pairKey = w => w.from + '>' + w.to;
 const pool = () => deck.words.filter(w => prefs.pair === 'all' || pairKey(w) === prefs.pair);
 const ARTICLES = /^(to|the|a|an|el|la|los|las|un|una|le|les|l'|une)\s+/;
 const fold = s => String(s || '').toLocaleLowerCase('tr').replace(/ı/g, 'i').normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(ARTICLES, '').replace(/[^\p{L}\p{N} ]/gu, '').replace(/\s+/g, ' ').trim();
-function isCorrect(given, answer) {
-  const g = fold(given); if (!g) return false;
-  return String(answer).split(/[,;/]/).some(a => fold(a) === g);
-}
-function pick() {
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// Known words still come back, just less often; missed words come back more often.
+const weight = w => w.known ? 0.2 / (1 + 0.25 * (w.right || 0)) : (1 + 2 * (w.wrong || 0)) / (1 + 0.5 * (w.right || 0));
+function pickWord() {
   const list = pool();
   if (!list.length) return null;
   const avoid = list.length > 4 ? recent : recent.slice(-Math.max(0, list.length - 1));
   const cand = list.filter(w => !avoid.includes(w.id));
   const from = cand.length ? cand : list;
-  // Words you missed come back more often; well-known words less often.
-  const weight = w => (1 + 2 * (w.wrong || 0)) / (1 + (w.right || 0));
   let r = Math.random() * from.reduce((s, w) => s + weight(w), 0);
   for (const w of from) { r -= weight(w); if (r <= 0) return w; }
   return from[from.length - 1];
 }
+
+// The word as it appears in its example sentence (for fill-in-the-blank questions).
+function formInSentence(w) {
+  if (!w.ex) return null;
+  const tokens = w.ex.match(/\p{L}+(?:['’]\p{L}+)*/gu) || [];
+  const low = t => lowerL(t, w.from);
+  if (w.form && tokens.includes(w.form)) return w.form;
+  const exact = tokens.find(t => low(t) === w.word); if (exact) return exact;
+  const stem = w.word.replace(/m[ae]k$/, '').slice(0, Math.max(3, Math.min(5, w.word.length - 1)));
+  return tokens.find(t => low(t).startsWith(stem)) || null;
+}
+
+// Wrong options come only from your own words, in the same language as the answer.
+function distractors(w, type, n) {
+  const ansText = type === 'fw' ? w.tr : w.word;
+  const lang = type === 'fw' ? w.to : w.from;
+  const seen = new Set([fold(ansText)]);
+  const out = [];
+  for (const o of shuffle(deck.words.slice())) {
+    if (o.id === w.id) continue;
+    const t = type === 'fw' ? (o.to === lang ? o.tr : null) : (o.from === lang ? o.word : null);
+    if (!t || seen.has(fold(t))) continue;
+    seen.add(fold(t)); out.push(t);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
+function makeCard(w) {
+  const types = prefs.mode === 'mix' ? ['fw', 'fw', 'bw', 'cloze', 'cloze'] : [prefs.mode];
+  let type = types[Math.floor(Math.random() * types.length)];
+  let blank = null;
+  if (type === 'cloze') { blank = formInSentence(w); if (!blank) type = prefs.mode === 'cloze' ? 'cloze' : 'fw'; }
+  const answer = type === 'fw' ? w.tr : w.word;
+  const wrong = distractors(w, type, 3);
+  if (wrong.length < 2) return { id: w.id, type, blank, options: null, reveal: false };   // too few words for choices yet
+  const options = shuffle([answer, ...wrong]);
+  return { id: w.id, type, blank, options, answer: options.indexOf(answer), chosen: null };
+}
 function nextCard() {
-  const w = pick();
-  cardId = w ? w.id : null; revealed = null;
+  clearTimeout(autoNext);
+  let w = pickWord();
+  if (w && prefs.mode === 'cloze') {   // sentence mode: only words that can be blanked out
+    const ok = pool().filter(x => formInSentence(x));
+    if (!ok.length) w = null; else if (!formInSentence(w)) w = ok[Math.floor(Math.random() * ok.length)];
+  }
+  card = w ? makeCard(w) : null;
   if (w) { recent.push(w.id); if (recent.length > 4) recent.shift(); }
 }
 function grade(ok) {
-  const w = deck.words.find(x => x.id === cardId); if (!w) return;
-  if (ok) { w.right = (w.right || 0) + 1; session.right++; session.streak++; } else { w.wrong = (w.wrong || 0) + 1; session.wrong++; session.streak = 0; }
+  const w = deck.words.find(x => x.id === card.id); if (!w) return;
+  if (ok) { w.right = (w.right || 0) + 1; w.known = true; session.right++; session.streak++; }
+  else { w.wrong = (w.wrong || 0) + 1; w.known = false; session.wrong++; session.streak = 0; }
   w.last = new Date().toISOString();
   saveJSON(WORDS_KEY, deck); scheduleWrite();
+}
+function choose(i) {
+  if (!card || !card.options || card.chosen != null) return;
+  const w = deck.words.find(x => x.id === card.id);
+  const wasKnown = w && w.known;
+  card.chosen = i;
+  const ok = i === card.answer;
+  card.newlyKnown = ok && !wasKnown;
+  grade(ok);
+  renderLearn();
+  if (ok) { const id = card.id; autoNext = setTimeout(() => { if (card && card.id === id && card.chosen != null) { nextCard(); renderLearn(); } }, 1200); }
 }
 
 function renderCard() {
   const list = pool();
   if (!deck.words.length) { $('card').innerHTML = '<div class="fc empty">Your word list is empty. Translate something with “Save words” ticked — every new word is saved in its dictionary form and shows up here.</div>'; return; }
   if (!list.length) { $('card').innerHTML = '<div class="fc empty">No words for this language pair yet.</div>'; return; }
-  let w = deck.words.find(x => x.id === cardId && list.includes(x));
-  if (!w) { nextCard(); w = deck.words.find(x => x.id === cardId); }
-  const fw = prefs.dir !== 'bw';
-  const q = fw ? w.word : w.tr, a = fw ? w.tr : w.word;
-  const qLang = fw ? w.from : w.to, aLang = fw ? w.to : w.from;
+  if (!card || !list.some(x => x.id === card.id)) nextCard();
+  if (!card) { $('card').innerHTML = '<div class="fc empty">None of these words has an example sentence to fill in yet — try another mode.</div>'; return; }
+  const w = deck.words.find(x => x.id === card.id);
+  const t = card.type;
+  const answerText = t === 'fw' ? w.tr : w.word;
+  const head = { fw: `${LANGS[w.from]} → ${LANGS[w.to]}`, bw: `${LANGS[w.to]} → ${LANGS[w.from]}`, cloze: `Fill in the blank · ${LANGS[w.from]}` }[t];
   const ex = w.ex ? `<div class="fc-ex">“${esc(w.ex)}”</div>` : '';
-  let body;
-  if (!revealed) {
-    body = `${fw ? ex : '<div class="fc-ex">&nbsp;</div>'}
-      <input id="fcIn" placeholder="Type it in ${esc(LANGS[aLang])}…" autocomplete="off" autocapitalize="off" spellcheck="false">
-      <div class="fc-acts"><button class="btn primary" data-c="check">Check</button><button class="btn" data-c="show">Show answer</button><button class="btn" data-c="skip">Skip</button></div>`;
-  } else if (revealed.typed != null) {
-    const ok = revealed.ok;
-    body = `${ex}<div class="fc-ans ${ok ? 'ok' : 'bad'}">${ok ? '✓ ' : '✗ '}${esc(a)}</div>
-      ${ok ? '' : `<div class="fc-you">You wrote: ${esc(revealed.typed) || '—'}</div>`}
-      <div class="fc-acts"><button class="btn primary" data-c="next">Next →</button>${ok ? '' : '<button class="btn good" data-c="override">I was right</button>'}</div>`;
+
+  let prompt;
+  if (t === 'cloze' && card.blank) {
+    const parts = w.ex.split(card.blank);
+    const filled = card.chosen != null ? `<span class="blank">${esc(card.blank)}</span>` : '<span class="blank">&nbsp;</span>';
+    prompt = `<div class="fc-sent">${esc(parts[0])}${filled}${esc(parts.slice(1).join(card.blank))}</div><div class="fc-hint">Meaning: <b>${esc(w.tr)}</b> — which word is missing?</div>`;
+  } else if (t === 'bw') {
+    prompt = `<div class="fc-word">${esc(w.tr)}</div><div class="fc-hint">Which ${esc(LANGS[w.from])} word means this?</div>`;
   } else {
-    body = `${ex}<div class="fc-ans">${esc(a)}</div>
-      <div class="fc-acts"><button class="btn good" data-c="knew">✓ I knew it</button><button class="btn bad" data-c="missed">✗ I didn't</button></div>`;
+    prompt = `<div class="fc-word">${esc(w.word)}</div>${ex}`;
   }
-  $('card').innerHTML = `<div class="fc"><div class="fc-lang">${esc(LANGS[qLang])} → ${esc(LANGS[aLang])}${(w.right || w.wrong) ? ` · ✓${w.right || 0} ✗${w.wrong || 0}` : ''}</div>
-    <div class="fc-word">${esc(q)}</div>${body}</div>`;
+
+  let body;
+  if (!card.options) {
+    // Not enough words for multiple choice yet: reveal and self-check.
+    body = card.reveal
+      ? `<div class="fc-ans">${esc(answerText)}</div><div class="fc-acts"><button class="btn good" data-c="knew">✓ I knew it</button><button class="btn bad" data-c="missed">✗ I didn't</button></div>`
+      : `<div class="fc-hint">Translate a few more words to get multiple choice.</div><div class="fc-acts"><button class="btn primary" data-c="show">Show answer</button><button class="btn" data-c="next">Skip</button></div>`;
+  } else {
+    const done = card.chosen != null;
+    body = `<div class="opts">${card.options.map((o, i) => {
+      const cls = !done ? '' : i === card.answer ? 'right' : i === card.chosen ? 'wrong' : 'dim';
+      return `<button class="opt ${cls}" data-opt="${i}" ${done ? 'disabled' : ''}><span class="k">${i + 1}</span>${esc(o)}</button>`;
+    }).join('')}</div>`;
+    if (done) {
+      const ok = card.chosen === card.answer;
+      body += ok
+        ? `<div class="fc-fb ok">✓ Correct${card.newlyKnown ? ' — added to the words you know' : ''}</div>`
+        : `<div class="fc-fb bad">✗ It was “${esc(answerText)}” — it will come back more often</div>${t === 'fw' ? '' : ex}`;
+      body += `<div class="fc-acts"><button class="btn ${ok ? '' : 'primary'}" data-c="next">Next →</button></div>`;
+    } else {
+      body += `<div class="fc-acts"><button class="btn" data-c="next">Skip</button></div>`;
+    }
+  }
+  $('card').innerHTML = `<div class="fc"><div class="fc-lang">${esc(head)}${w.known ? ' · <span class="known">known</span>' : ''}</div>${prompt}${body}</div>`;
 }
 
 function renderLearn() {
@@ -589,8 +681,10 @@ function renderLearn() {
   if (prefs.pair !== 'all' && !pairs.has(prefs.pair)) prefs.pair = 'all';
   $('pairSel').innerHTML = `<option value="all">All languages (${deck.words.length})</option>` +
     [...pairs].map(([k, n]) => { const [a, b] = k.split('>'); return `<option value="${k}" ${k === prefs.pair ? 'selected' : ''}>${LANGS[a]} → ${LANGS[b]} (${n})</option>`; }).join('');
-  for (const b of $('dirSeg').children) b.classList.toggle('on', b.dataset.dir === (prefs.dir || 'fw'));
-  $('score').innerHTML = session.right + session.wrong ? `This session: <b class="ok">✓ ${session.right}</b> · <b class="bad">✗ ${session.wrong}</b>${session.streak > 2 ? ` · 🔥 ${session.streak}` : ''}` : '';
+  for (const b of $('modeSeg').children) b.classList.toggle('on', b.dataset.mode === prefs.mode);
+  const p = pool(), known = p.filter(w => w.known).length;
+  $('score').innerHTML = `Known <b class="ok">${known}</b> / ${p.length}` +
+    (session.right + session.wrong ? ` · This session: <b class="ok">✓ ${session.right}</b> <b class="bad">✗ ${session.wrong}</b>${session.streak > 2 ? ` · 🔥 ${session.streak}` : ''}` : '');
   renderCard();
   renderWordList();
 }
@@ -601,9 +695,10 @@ function renderWordList() {
   $('listSum').textContent = `All words (${pool().length})`;
   if (!$('listBox').open) return;
   if (!list.length) { $('wordList').innerHTML = '<div class="empty">No words.</div>'; return; }
-  $('wordList').innerHTML = `<div class="wl"><table><thead><tr><th>Word</th><th>Meaning</th><th>Languages</th><th class="num">✓ / ✗</th><th></th></tr></thead><tbody>${
+  $('wordList').innerHTML = `<div class="wl"><table><thead><tr><th>Word</th><th>Meaning</th><th>Languages</th><th class="num">✓ / ✗</th><th>Known</th><th></th></tr></thead><tbody>${
     list.slice(0, 500).map(w => `<tr><td><b>${esc(w.word)}</b></td><td><input value="${esc(w.tr)}" data-edit="${esc(w.id)}" title="Edit the meaning"></td>
       <td class="num">${w.from.toUpperCase()} → ${w.to.toUpperCase()}</td><td class="num">${w.right || 0} / ${w.wrong || 0}</td>
+      <td><button class="knownbtn ${w.known ? 'on' : ''}" data-known="${esc(w.id)}" title="Mark as known / not known">${w.known ? '✓ known' : 'learning'}</button></td>
       <td><button class="x" data-rm="${esc(w.id)}" title="Remove from list">×</button></td></tr>`).join('')
   }</tbody></table></div>`;
 }
@@ -615,35 +710,35 @@ $('filebar').addEventListener('click', e => {
   if (fn) fn();
 });
 $('filebar').addEventListener('change', e => { if (e.target.dataset.f === 'import' && e.target.files[0]) importWords(e.target.files[0]); e.target.value = ''; });
-$('pairSel').onchange = e => { prefs.pair = e.target.value; savePrefs(); cardId = null; recent = []; renderLearn(); };
-$('dirSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; prefs.dir = b.dataset.dir; savePrefs(); revealed = null; renderLearn(); };
+$('pairSel').onchange = e => { prefs.pair = e.target.value; savePrefs(); card = null; recent = []; renderLearn(); };
+$('modeSeg').onclick = e => { const b = e.target.closest('button'); if (!b) return; prefs.mode = b.dataset.mode; savePrefs(); card = null; renderLearn(); };
 $('card').addEventListener('click', e => {
-  const b = e.target.closest('[data-c]'); if (!b) return;
+  const o = e.target.closest('[data-opt]');
+  if (o) return choose(+o.dataset.opt);
+  const b = e.target.closest('[data-c]'); if (!b || !card) return;
   const c = b.dataset.c;
-  const w = deck.words.find(x => x.id === cardId); if (!w) return;
-  const answer = prefs.dir !== 'bw' ? w.tr : w.word;
-  if (c === 'check') { const typed = $('fcIn').value; if (!typed.trim()) return $('fcIn').focus(); const ok = isCorrect(typed, answer); revealed = { typed, ok }; grade(ok); }
-  else if (c === 'show') revealed = { typed: null };
-  else if (c === 'skip' || c === 'next') nextCard();
-  else if (c === 'override') { w.wrong = Math.max(0, (w.wrong || 0) - 1); w.right = (w.right || 0) + 1; session.wrong = Math.max(0, session.wrong - 1); session.right++; saveJSON(WORDS_KEY, deck); scheduleWrite(); nextCard(); }
+  if (c === 'next') nextCard();
+  else if (c === 'show') card.reveal = true;
   else if (c === 'knew' || c === 'missed') { grade(c === 'knew'); nextCard(); }
   renderLearn();
-  const focus = $('card').querySelector('#fcIn') || $('card').querySelector('[data-c="next"]');
-  if (focus) focus.focus();
 });
-$('card').addEventListener('keydown', e => {
-  if (e.key !== 'Enter' || e.target.tagName === 'BUTTON') return;
-  e.preventDefault();
-  const b = $('card').querySelector('[data-c="check"]'); if (b) b.click();
+// Keys 1–4 pick an option, Enter goes to the next card (not while typing elsewhere).
+document.addEventListener('keydown', e => {
+  const tag = document.activeElement && document.activeElement.tagName;
+  if (['TEXTAREA', 'INPUT', 'SELECT'].includes(tag) || e.ctrlKey || e.metaKey || e.altKey || !card) return;
+  if (/^[1-4]$/.test(e.key) && card.options && card.chosen == null && +e.key <= card.options.length) { e.preventDefault(); choose(+e.key - 1); }
+  else if (e.key === 'Enter' && (card.chosen != null || card.reveal === undefined)) { const b = $('card').querySelector('[data-c="next"]'); if (b && card.chosen != null) { e.preventDefault(); b.click(); } }
 });
 $('wordSearch').oninput = renderWordList;
 $('listBox').addEventListener('toggle', renderWordList);
 $('wordList').addEventListener('click', e => {
+  const k = e.target.closest('[data-known]');
+  if (k) { const w = deck.words.find(x => x.id === k.dataset.known); if (w) { w.known = !w.known; persistDeck(); } return; }
   const b = e.target.closest('[data-rm]'); if (!b) return;
   const w = deck.words.find(x => x.id === b.dataset.rm);
   if (!w || !confirm(`Remove “${w.word}” from your word list?`)) return;
   deck.words = deck.words.filter(x => x !== w);
-  if (cardId === w.id) cardId = null;
+  if (card && card.id === w.id) card = null;
   persistDeck();
 });
 $('wordList').addEventListener('change', e => {
@@ -656,7 +751,7 @@ $('wordList').addEventListener('change', e => {
    Start
    ========================================================= */
 $('src').value = prefs.text || '';
-prefs.learn = prefs.learn !== false; prefs.pair = prefs.pair || 'all'; prefs.dir = prefs.dir || 'fw';
+prefs.learn = prefs.learn !== false; prefs.pair = prefs.pair || 'all'; prefs.mode = ['mix', 'fw', 'bw', 'cloze'].includes(prefs.mode) ? prefs.mode : 'mix';
 $('learnToggle').checked = prefs.learn;
 renderLangs(); updateCount(); renderModels();
 initFile();

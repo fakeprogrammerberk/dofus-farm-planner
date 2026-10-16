@@ -50,7 +50,8 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Runs entirely in your browser with OPUS-MT and M2M100 models (Transformers.js) — your text never leaves your device
 - Each language pack downloads once (about 110 MB, or 640 MB for English → Turkish) and then works offline
 - Pairs without a direct pack go through English automatically; long texts are translated sentence by sentence and keep their line breaks
-- **Flashcards:** every new word you translate is saved in its dictionary form (infinitive / singular) with its meaning and example sentence, then asked back at random — missed words come back more often
+- **Flashcards:** every new word you translate is saved in its dictionary form (infinitive / singular) with its meaning and example sentence, then asked back at random as a multiple-choice question (4 options taken from your own words): word → meaning, meaning → word, or fill-in-the-blank in your original sentence
+- Words you answer correctly are marked as known and come back less often (but still come back); missed words come back more often
 - Your word list is saved to a JSON file on your computer (Chrome/Edge) and loaded from it every time; edit or remove words in the list
 - Dictionary forms come from [lemmatization-lists](https://github.com/michmech/lemmatization-lists) (English, Spanish, French — ODbL) and the [Zemberek](https://github.com/ahmetaa/zemberek-nlp) Turkish root dictionary (Apache 2.0)
 
