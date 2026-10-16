@@ -1,7 +1,7 @@
 // Keeps the translator usable offline: caches the page, its worker and the
 // translation library. Requests from the other pages are left untouched.
-const CACHE = 'dfp-translator-v1';
-const PAGES = ['translate.html', 'translate-worker.js'];
+const CACHE = 'dfp-translator-v2';
+const PAGES = ['translate.html', 'translate-worker.js', 'translate-words.js'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PAGES)).then(() => self.skipWaiting()));
@@ -25,8 +25,10 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // The translation library and its WebAssembly runtime: versioned URLs, so cache first.
-  if (url.hostname === 'cdn.jsdelivr.net' && url.pathname.includes('/@huggingface/transformers@')) {
+  // The translation library, its WebAssembly runtime and the word dictionaries:
+  // pinned versions, so cache first.
+  if (url.hostname === 'cdn.jsdelivr.net' && (url.pathname.includes('/@huggingface/transformers@') ||
+      url.pathname.startsWith('/gh/michmech/lemmatization-lists@') || url.pathname.startsWith('/gh/ahmetaa/zemberek-nlp@'))) {
     e.respondWith(caches.match(e.request).then(hit => hit || fetch(e.request).then(r => {
       if (r.ok) { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); }
       return r;
