@@ -28,6 +28,8 @@ Game data comes live from the public [DofusDB](https://dofusdb.fr) API. Your pri
 - Tick whole quests or individual steps; progress is saved automatically in your browser
 - Overall and per-category progress bars, filters (available now, in progress, completed, level range)
 - Reset all progress or one category; export/import a progress backup
+- Item rewards for every step and items needed to start a quest, with their pictures
+- 📖 link to each quest's French guide on [Dofus pour les Noobs](https://www.dofuspourlesnoobs.com) (or a search there when no guide page matches); links are rebuilt with `python tools/update-guide-links.py`
 
 ## Profession XP Calculator (`jobs.html`)
 
